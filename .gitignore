@@ -16,3 +16,4 @@ bin-int/
 *.filters
 *.xml
 *.sln
+*.idb
