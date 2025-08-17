@@ -1,6 +1,5 @@
 #pragma once
 #include "UploadBuffer.h"
-#include "review/BoxApp.h"
 
 struct PassConstant
 {
@@ -19,7 +18,15 @@ struct PassConstant
     float TotalTime;
     float DeltaTime;
 };
-
+struct ObjectConsts
+{
+    DirectX::XMFLOAT4X4 World;
+};
+struct Vertex
+{
+    DirectX::XMFLOAT3 Pos;
+    DirectX::XMFLOAT4 Color;
+};
 const int gNumFrameResources = 3;
 struct RenderItem
 {
@@ -42,7 +49,7 @@ struct RenderItem
     UINT IndexCount = 0;
     UINT StartIndexLocation = 0;
     int BaseVertexLocation = 0;
-        
+    D3D12_PRIMITIVE_TOPOLOGY PrimitiveType;
 };
 
 class FrameResource
@@ -50,7 +57,7 @@ class FrameResource
 public:
     FrameResource(ID3D12Device* device, UINT passCount, UINT objectCount);
     FrameResource(const FrameResource&) = delete;
-    FrameResource& operator=(const FrameResource& rhs) = delete;
+    FrameResource& operator=(const FrameResource) = delete;
     ~FrameResource();
 
     // 在GPU处理与此命令分配器相关的命令之前，我们不能对它进行重置。

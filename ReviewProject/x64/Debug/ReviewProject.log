@@ -1,12 +1,19 @@
-﻿  D3DUtil.cpp
-D:\Direct12\directProject\ReviewProject\ReviewProject\source\D3DUtil.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
-  用于 x64 的 Microsoft (R) C/C++ 优化编译器 19.36.32543 版
+﻿  用于 x64 的 Microsoft (R) C/C++ 优化编译器 19.36.32543 版
   版权所有(C) Microsoft Corporation。保留所有权利。
-  cl /c /ZI /JMC /W3 /WX- /diagnostics:column /sdl /Od /D _DEBUG /D _WINDOWS /D _UNICODE /D UNICODE /Gm- /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /std:c++17 /permissive- /Yc"D3DUtil.h" /Fp"x64\Debug\ReviewProject.pch" /Fo"x64\Debug\\" /Fd"x64\Debug\vc143.pdb" /external:W3 /Gd /TP /FC /errorReport:prompt source\review\BoxApp.cpp
-  BoxApp.cpp
-D:\Direct12\directProject\ReviewProject\ReviewProject\source\review\BoxApp.cpp(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
-D:\Direct12\directProject\ReviewProject\ReviewProject\source\D3DUtil.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
-D:\Direct12\directProject\ReviewProject\ReviewProject\source\core\D3DApp.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
-D:\Direct12\directProject\ReviewProject\ReviewProject\source\core\GameTimer.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
-D:\Direct12\directProject\ReviewProject\ReviewProject\source\review\BoxApp.cpp(157,38): warning C4267: “=”: 从“size_t”转换到“UINT”，可能丢失数据
-  ReviewProject.vcxproj -> D:\Direct12\directProject\ReviewProject\x64\Debug\ReviewProject.exe
+  cl /c /ZI /JMC /W3 /WX- /diagnostics:column /sdl /Od /D _DEBUG /D _WINDOWS /D _UNICODE /D UNICODE /Gm- /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /std:c++17 /permissive- /Yc"D3DUtil.h" /Fp"x64\Debug\ReviewProject.pch" /Fo"x64\Debug\\" /Fd"x64\Debug\vc143.pdb" /external:W3 /Gd /TP /FC /errorReport:prompt source\ReviewProject.cpp source\review\ShapesApp.cpp
+  ReviewProject.cpp
+D:\Direct12\ReviewProject\ReviewProject\source\ReviewProject.cpp(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+D:\Direct12\ReviewProject\ReviewProject\source\D3DUtil.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+D:\Direct12\ReviewProject\ReviewProject\source\core\D3DApp.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+D:\Direct12\ReviewProject\ReviewProject\source\core\GameTimer.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+D:\Direct12\ReviewProject\ReviewProject\source\core\FrameResource.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+  ShapesApp.cpp
+D:\Direct12\ReviewProject\ReviewProject\source\review\ShapesApp.cpp(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+D:\Direct12\ReviewProject\ReviewProject\source\D3DUtil.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+D:\Direct12\ReviewProject\ReviewProject\source\core\D3DApp.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+D:\Direct12\ReviewProject\ReviewProject\source\core\GameTimer.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+D:\Direct12\ReviewProject\ReviewProject\source\core\FrameResource.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+D:\Direct12\ReviewProject\ReviewProject\source\review\ShapesApp.cpp(256,37): warning C4244: “=”: 从“UINT64”转换到“UINT”，可能丢失数据
+D:\Direct12\ReviewProject\ReviewProject\source\review\ShapesApp.cpp(364,24): warning C4018: “<”: 有符号/无符号不匹配
+D:\Direct12\ReviewProject\ReviewProject\source\review\ShapesApp.cpp(385,42): warning C4018: “<”: 有符号/无符号不匹配
+  ReviewProject.vcxproj -> D:\Direct12\ReviewProject\x64\Debug\ReviewProject.exe

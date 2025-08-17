@@ -2,17 +2,7 @@
 #include "D3DUtil.h"
 #include "D3DApp.h"
 #include "UploadBuffer.h"
-
-struct Vertex
-{
-    DirectX::XMFLOAT3 Pos;
-    DirectX::XMFLOAT4 Color;
-};
-
-struct ObjectConsts
-{
-    DirectX::XMFLOAT4X4 WorldViewProj;
-};
+#include "core/FrameResource.h"
 
 class BoxApp : public D3DApp
 {

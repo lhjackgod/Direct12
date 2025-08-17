@@ -17,7 +17,7 @@ public:
         ) :
         Position(p),
         Normal(n),
-        Tangent(t),
+        TangentU(t),
         TexC(uv){}
         Vertex(float px, float py, float pz,
             float nx, float ny, float nz,
@@ -25,11 +25,11 @@ public:
             float u, float v):
         Position(px, py, pz),
         Normal(nx, ny, nz),
-        Tangent(tx, ty, tz),
+        TangentU(tx, ty, tz),
         TexC(u, v) {}
         DirectX::XMFLOAT3 Position;
         DirectX::XMFLOAT3 Normal;
-        DirectX::XMFLOAT3 Tangent;
+        DirectX::XMFLOAT3 TangentU;
         DirectX::XMFLOAT2 TexC;
     };
 
@@ -38,15 +38,23 @@ public:
         std::vector<Vertex> Vertices;
         std::vector<uint32> Indices32;
 
-        std::vector<uint32>& GetIndices16()
+        std::vector<uint16>& GetIndices16()
         {
             m_Indices.resize(Indices32.size());
             for (size_t i = 0; i < Indices32.size(); i++)
             {
                 m_Indices[i] = static_cast<uint16>(Indices32[i]);
             }
+            return m_Indices;
         }
     private:
         std::vector<uint16> m_Indices;
     };
+    MeshData CreateCylinder(float bottomRadius, float topRadius, float height, uint32 sliceCount, uint32 stackCount);
+    void BuildCyclinderTopCap(float bottomRadius, float topRadius, float height, uint32 sliceCount, uint32 stackCount, MeshData& meshData);
+    void BuildCyclinderBottomCap(float bottomRadius, float topRadius, float height, uint32 sliceCount, uint32 stackCount, MeshData& meshData);
+    MeshData CreateSphere(float radius, uint32 sliceCount, uint32 stackCount);
+    MeshData CreateGeosphere(float radius, uint32 numSubdivisions);
+    MeshData CreateBox(float width, float height, float depth);
+    void Subdivide(MeshData& meshData);
 };

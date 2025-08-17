@@ -1,5 +1,5 @@
 #include "D3DUtil.h"
-#include "review/BoxApp.h"
+#include "review/ShapesApp.h"
 #include "d3dx12.h"
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PSTR cmdLine, int showCmd)
 {
@@ -9,7 +9,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PSTR cmdLine, in
     #endif
     try
     {
-        BoxApp app(hInstance);
+        ShapesApp app(hInstance);
         if (!app.Initialize())
             return 0;
         return app.Run();

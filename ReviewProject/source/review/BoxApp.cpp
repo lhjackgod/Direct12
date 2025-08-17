@@ -244,7 +244,7 @@ void BoxApp::Update(const GameTimer& gt)
     DirectX::XMMATRIX worldViewProj = world * view * proj;
 
     ObjectConsts objConstants;
-    DirectX::XMStoreFloat4x4(&objConstants.WorldViewProj, DirectX::XMMatrixTranspose(worldViewProj));
+    DirectX::XMStoreFloat4x4(&objConstants.World, DirectX::XMMatrixTranspose(worldViewProj));
     //objConstants.WorldViewProj = MathHelper::Identity4x4();
     m_ObjectCB->CopyData(0, objConstants);
 }

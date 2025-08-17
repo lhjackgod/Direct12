@@ -1,0 +1,48 @@
+cbuffer passCBuffer : register(b0)
+{
+    float4x4 View;
+    float4x4 InvView;
+    float4x4 Proj;
+    float4x4 InvProj;
+    float4x4 ViewProj;
+    float4x4 InvViewProj;
+    float3 EyePosW;
+    float cbPerObjectPad1;
+    float2 RenderTargetSize;
+    float2 InvRenderTargetSize;
+    float NearZ;
+    float FarZ;
+    float TotalTime;
+    float DeltaTime;
+};
+cbuffer objCBuffer : register(b1)
+{
+    float4x4 worldProj;
+};
+
+struct VertexOut
+{
+    float4 pos : SV_Position;
+    float4 color : COLOR;
+};
+
+struct VertexIn
+{
+    float3 pos : POSITION;
+    float4 color : COLOR;
+};
+
+VertexOut VS(VertexIn input)
+{
+    VertexOut output;
+    float4 posW = mul(float4(input.pos, 1.0f), worldProj);
+    output.pos = mul(posW, ViewProj);
+
+    output.color = input.color;
+    return output;
+}
+
+float4 PS(VertexOut PSInput) : SV_Target
+{
+    return PSInput.color;
+}
