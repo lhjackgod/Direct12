@@ -17,8 +17,8 @@ bool ShapesApp::Initialize()
         return false;
     
     ThrowIfFailed(m_CommandList->Reset(m_CommandAllocator.Get(), nullptr));
-    BuildShapeGeometry();
-    BuildRenderItems();
+    BuildLandGeometry();
+    BuildLandRenderItems();
     BuildConstHeadDescriptor();
     BuildFrameResources();
     BuildConstantBufferViews();
@@ -62,7 +62,18 @@ void ShapesApp::BuildRenderItems()
     boxRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_LINESTRIP;
     mAllRitems.push_back(std::move(boxRitem));
 
-    UINT objCBIndex = 1;
+    std::unique_ptr<RenderItem> gridRitem = std::make_unique<RenderItem>();
+    gridRitem->Geo = m_Geometries["shapeGeo"].get();
+    gridRitem->World = MathHelper::Identity4x4();
+    gridRitem->ObjCBIndex = 1;
+    gridRitem->Geo = m_Geometries["shapeGeo"].get();
+    gridRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_LINESTRIP;
+    gridRitem->BaseVertexLocation = gridRitem->Geo->DrawArgs["grid"].BaseVertexLocation;
+    gridRitem->StartIndexLocation = gridRitem->Geo->DrawArgs["grid"].StartIndexLocation;
+    gridRitem->IndexCount = gridRitem->Geo->DrawArgs["grid"].IndexCount;
+    mAllRitems.push_back(std::move(gridRitem));
+
+    UINT objCBIndex = 2;
     for (int i = 0; i < 5; i++)
     {
         auto leftCylRitem = std::make_unique<RenderItem>();
@@ -116,6 +127,21 @@ void ShapesApp::BuildRenderItems()
     {
         mOpaqueRitems.push_back(e.get());
     }
+}
+
+void ShapesApp::BuildLandRenderItems()
+{
+    std::unique_ptr<RenderItem> landRitem = std::make_unique<RenderItem>();
+    landRitem->World = MathHelper::Identity4x4();
+    landRitem->ObjCBIndex = 0;
+    landRitem->Geo = m_Geometries["lanGeo"].get();
+    landRitem->IndexCount = landRitem->Geo->DrawArgs["grid"].IndexCount;
+    landRitem->StartIndexLocation = landRitem->Geo->DrawArgs["grid"].StartIndexLocation;
+    landRitem->BaseVertexLocation = landRitem->Geo->DrawArgs["grid"].BaseVertexLocation;
+    landRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+
+    mOpaqueRitems.push_back(landRitem.get());
+    mAllRitems.push_back(std::move(landRitem));
 }
 
 void ShapesApp::UpdateObjectCBs(const GameTimer& gt)
@@ -208,10 +234,15 @@ void ShapesApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::v
         cmdList->IASetIndexBuffer(&indexBufferView);
         cmdList->IASetPrimitiveTopology(ri->PrimitiveType);
 
-        UINT objCbvIndex = m_CurrentFrameResourceIndex * (UINT)mOpaqueRitems.size() + ri->ObjCBIndex;
-        CD3DX12_GPU_DESCRIPTOR_HANDLE handle(m_CbvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+        //UINT objCbvIndex = m_CurrentFrameResourceIndex * (UINT)mOpaqueRitems.size() + ri->ObjCBIndex;
+        /*CD3DX12_GPU_DESCRIPTOR_HANDLE handle(m_CbvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
         handle.Offset(objCbvIndex, m_CbvSrvUavDescriptorSize);
-        cmdList->SetGraphicsRootDescriptorTable(1, handle);
+        cmdList->SetGraphicsRootDescriptorTable(1, handle);*/
+        ID3D12Resource* cbBuffer= (ID3D12Resource*)(*m_CurrentFrameResource->ObjectCB);
+        D3D12_GPU_VIRTUAL_ADDRESS gpuAddress = cbBuffer->GetGPUVirtualAddress();
+        UINT objCBByteSize = d3dUtil::CalcConstBufferByteSize(sizeof(ObjectConsts));
+        gpuAddress += objCBByteSize * ri->ObjCBIndex;
+        cmdList->SetGraphicsRootConstantBufferView(1, gpuAddress);
         cmdList->DrawIndexedInstanced(ri->IndexCount, 1, ri->StartIndexLocation, ri->BaseVertexLocation, 0);
     }
 }
@@ -235,14 +266,19 @@ void ShapesApp::Draw(const GameTimer& gt)
     m_CommandList->ClearRenderTargetView(renderTarHandle, DirectX::Colors::LightSteelBlue, 0, nullptr);
     m_CommandList->ClearDepthStencilView(depthTarHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 
-    //绑定到渲染流水线的descriptorheap
+    /*//绑定到渲染流水线的descriptorheap
     ID3D12DescriptorHeap* descritptorHeaps[] = { m_CbvDescriptorHeap.Get()};
-    m_CommandList->SetDescriptorHeaps(_countof(descritptorHeaps), descritptorHeaps);
+    m_CommandList->SetDescriptorHeaps(_countof(descritptorHeaps), descritptorHeaps);*/
     m_CommandList->SetGraphicsRootSignature(m_RootSignature.Get());
-    int passCbvIndex = m_PassCbvOffset + m_CurrentFrameResourceIndex;
-    CD3DX12_GPU_DESCRIPTOR_HANDLE handle(m_CbvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
-    handle.Offset(passCbvIndex, m_CbvSrvUavDescriptorSize);
-    m_CommandList->SetGraphicsRootDescriptorTable(0, handle);
+    //int passCbvIndex = m_PassCbvOffset + m_CurrentFrameResourceIndex;
+    /*CD3DX12_GPU_DESCRIPTOR_HANDLE handle(m_CbvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+    handle.Offset(passCbvIndex, m_CbvSrvUavDescriptorSize);*/
+    /*m_CommandList->SetGraphicsRootDescriptorTable(0, handle);*/
+    ID3D12Resource* frameCBAddress = (ID3D12Resource*)(*m_CurrentFrameResource->PassCB);
+    
+    m_CommandList->SetGraphicsRootConstantBufferView(
+        0, frameCBAddress->GetGPUVirtualAddress()
+        );
     
     DrawRenderItems(m_CommandList.Get(), mOpaqueRitems);
     renderTarBarrier = CD3DX12_RESOURCE_BARRIER::Transition(frameTar, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
@@ -261,21 +297,29 @@ void ShapesApp::BuildShapeGeometry()
 {
     GeometryGenerator geoGen;
     GeometryGenerator::MeshData box = geoGen.CreateBox(1.5f, 0.5f, 1.5f);
+    GeometryGenerator::MeshData grid = geoGen.CreateGrid(20.0f, 30.0f, 60, 40);
     GeometryGenerator::MeshData sphere = geoGen.CreateSphere(0.5f, 20, 20);
     GeometryGenerator::MeshData cylinder = geoGen.CreateCylinder(0.5f, 0.3f, 3.0f, 20, 20);
 
     UINT boxVertexOffset = 0;
-    UINT sphereVertexOffset = (UINT)box.Vertices.size();
+    UINT gridVertexOffset = (UINT)box.Vertices.size();
+    UINT sphereVertexOffset = (UINT)grid.Vertices.size() + gridVertexOffset;
     UINT cylinderVertexOffset = (UINT)sphere.Vertices.size() + sphereVertexOffset;
 
     UINT boxIndexOffset = 0;
-    UINT sphereIndexOffset = (UINT)box.Indices32.size();
+    UINT gridIndexOffset = (UINT)box.Indices32.size();
+    UINT sphereIndexOffset = gridIndexOffset + grid.Indices32.size();
     UINT cylinderIndexOffset = (UINT)sphere.Indices32.size() + sphereIndexOffset;
 
     d3dUtil::SubmeshGeometry boxSubmesh;
     boxSubmesh.IndexCount = (UINT)box.Indices32.size();
     boxSubmesh.StartIndexLocation = boxIndexOffset;
     boxSubmesh.BaseVertexLocation = boxVertexOffset;
+
+    d3dUtil::SubmeshGeometry gridSubMesh;
+    gridSubMesh.IndexCount = (UINT)grid.Indices32.size();
+    gridSubMesh.StartIndexLocation = gridIndexOffset;
+    gridSubMesh.BaseVertexLocation = gridVertexOffset;
 
     d3dUtil::SubmeshGeometry sphereSubmesh;
     sphereSubmesh.IndexCount = (UINT)sphere.Indices32.size();
@@ -288,7 +332,7 @@ void ShapesApp::BuildShapeGeometry()
     cylinderSubmesh.BaseVertexLocation = cylinderVertexOffset;
 
     //提取出所需的顶点元素，再将所有网络的顶点装进一个顶点缓冲区
-    auto totalVertexCount = box.Vertices.size() +
+    auto totalVertexCount = box.Vertices.size() + grid.Vertices.size() + 
         sphere.Vertices.size() + cylinder.Vertices.size();
     std::vector<Vertex> vertices(totalVertexCount);
     UINT k = 0;
@@ -298,6 +342,13 @@ void ShapesApp::BuildShapeGeometry()
         vertices[k].Pos = box.Vertices[i].Position;
         vertices[k].Color = DirectX::XMFLOAT4(DirectX::Colors::DarkGreen);
     }
+
+    for (size_t i = 0; i < grid.Vertices.size(); i++, k++)
+    {
+        vertices[k].Pos = grid.Vertices[i].Position;
+        vertices[k].Color = DirectX::XMFLOAT4(DirectX::Colors::ForestGreen);
+    }
+    
     for (size_t i = 0; i < sphere.Vertices.size(); i++, k++)
     {
         vertices[k].Pos = sphere.Vertices[i].Position;
@@ -310,6 +361,7 @@ void ShapesApp::BuildShapeGeometry()
     }
     std::vector<std::uint16_t> indices;
     indices.insert(indices.end(), box.GetIndices16().begin(), box.GetIndices16().end());
+    indices.insert(indices.end(), grid.GetIndices16().begin(), grid.GetIndices16().end());
     indices.insert(indices.end(), sphere.GetIndices16().begin(), sphere.GetIndices16().end());
     indices.insert(indices.end(), cylinder.GetIndices16().begin(), cylinder.GetIndices16().end());
 
@@ -333,11 +385,79 @@ void ShapesApp::BuildShapeGeometry()
     geo->IndexFormat = DXGI_FORMAT_R16_UINT;
 
     geo->DrawArgs["box"] = boxSubmesh;
+    geo->DrawArgs["grid"] = gridSubMesh;
     geo->DrawArgs["sphere"] = sphereSubmesh;
     geo->DrawArgs["cylinder"] = cylinderSubmesh;
     
     m_Geometries[geo->Name] = std::move(geo);
 }
+
+void ShapesApp::BuildLandGeometry()
+{
+    GeometryGenerator geoGen;
+    GeometryGenerator::MeshData grid = geoGen.CreateGrid(160.0f, 160.0f, 50, 50);
+
+    std::vector<Vertex> vertices(grid.Vertices.size());
+    for (size_t i = 0; i < grid.Vertices.size(); i++)
+    {
+        auto& p = grid.Vertices[i].Position;
+        vertices[i].Pos = p;
+        vertices[i].Pos.y = GetHillHeight(p.x, p.z);
+
+        //基于顶点高度为它上色
+        if (vertices[i].Pos.y < -10.0f)
+        {
+            //沙滩黄色
+            vertices[i].Color = DirectX::XMFLOAT4(1.0f, 0.96f, 0.62f, 1.0f);
+        }
+        else if (vertices[i].Pos.y < 5.0f)
+        {
+            //浅黄绿色
+            vertices[i].Color = DirectX::XMFLOAT4(0.48f, 0.77f, 0.46f, 1.0f);
+        }
+        else if (vertices[i].Pos.y < 12.0f)
+        {
+            //深黄绿色
+            vertices[i].Color = DirectX::XMFLOAT4(0.1f, 0.48f, 0.19f, 1.0f);
+        }
+        else if (vertices[i].Pos.y < 20.0f)
+        {
+            //深棕色
+            vertices[i].Color = DirectX::XMFLOAT4(0.45f, 0.39f, 0.34f, 1.0f);
+        }
+        else
+        {
+            //白雪皑皑
+            vertices[i].Color = DirectX::XMFLOAT4(1.0f, 1.f, 1.f ,1.f);
+        }
+    }
+
+    auto geo = std::make_unique<d3dUtil::MeshGeometry>();
+    geo->Name = "lanGeo";
+    geo->VertexByteSize = (UINT) sizeof(Vertex) * vertices.size();
+    geo->IndexBufferByteSize = (UINT) sizeof(uint16_t) * grid.GetIndices16().size();
+    ThrowIfFailed(D3DCreateBlob(geo->VertexByteSize, geo->VertexBufferCPU.GetAddressOf()));
+    ThrowIfFailed(D3DCreateBlob(geo->IndexBufferByteSize, geo->IndexBufferCPU.GetAddressOf()));
+    CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), vertices.data(), geo->VertexByteSize);
+    CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), grid.GetIndices16().data(), sizeof(uint16_t) * grid.GetIndices16().size());
+    geo->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(m_Device.Get(), m_CommandList.Get(), vertices.data(), geo->VertexByteSize, geo->VertexBufferUploader);
+    geo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(m_Device.Get(), m_CommandList.Get(), grid.GetIndices16().data(), geo->IndexBufferByteSize, geo->IndexBufferUploader);
+    geo->VertexByteStride = sizeof(Vertex);
+
+    d3dUtil::SubmeshGeometry subMesh;
+    subMesh.IndexCount = (UINT)grid.GetIndices16().size();
+    subMesh.BaseVertexLocation = 0;
+    subMesh.StartIndexLocation = 0;
+    geo->DrawArgs["grid"] = subMesh;
+    m_Geometries[geo->Name] = std::move(geo);
+}
+
+
+float ShapesApp::GetHillHeight(float x, float z) const
+{
+    return 0.3f * (z * sinf(0.1f * x) + x * cosf(0.1f * z));
+}
+
 
 void ShapesApp::BuildConstHeadDescriptor()
 {
@@ -397,15 +517,10 @@ void ShapesApp::BuildConstantBufferViews()
 
 void ShapesApp::BuildRootSignature()
 {
-    CD3DX12_DESCRIPTOR_RANGE passCbv;
-    passCbv.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
-    CD3DX12_DESCRIPTOR_RANGE objCbv;
-    objCbv.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1);
-    
     CD3DX12_ROOT_PARAMETER rootParameters[2];
-    rootParameters[0].InitAsDescriptorTable(1, &passCbv);
-    rootParameters[1].InitAsDescriptorTable(1, &objCbv);
-
+    rootParameters[0].InitAsConstantBufferView(0);
+    rootParameters[1].InitAsConstantBufferView(1);
+    
     CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc(2, rootParameters, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
     ComPtr<ID3DBlob> error;
     ComPtr<ID3DBlob> rootSignature;
@@ -484,5 +599,3 @@ void ShapesApp::OnMouseUp(WPARAM btnState, int x, int y)
 {
     ReleaseCapture();
 }
-
-

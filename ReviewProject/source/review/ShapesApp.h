@@ -27,6 +27,9 @@ public:
     void OnMouseDown(WPARAM btnState, int x, int y) override;
     void OnMouseMove(WPARAM btnState, int x, int y) override;
     void OnMouseUp(WPARAM btnState, int x, int y) override;
+    void BuildLandGeometry();
+    void BuildLandRenderItems();
+    float GetHillHeight(float x, float z) const;
 private:
 
     void Update(const GameTimer& gt) override;

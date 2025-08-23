@@ -275,6 +275,47 @@ GeometryGenerator::MeshData GeometryGenerator::CreateBox(float width, float heig
     return meshData;
 }
 
+GeometryGenerator::MeshData GeometryGenerator::CreateGrid(float width, float depth, uint32 m, uint32 n)
+{
+    MeshData meshData;
+    uint32 vertexCount = m * n;
+
+    float dWidth = width / (float) (n - 1);
+    float dDepth = depth / (float) (m - 1);
+    float du = 1.0f / (float) (n - 1);
+    float dv = 1.0f / (float) (m - 1);
+    for (uint32 i = 0; i < m; i++)
+    {
+        for (uint32 j = 0; j < n; j++)
+        {
+            Vertex vertex;
+            float x = -0.5f * width + dWidth * (float) j;
+            float z = 0.5f * depth  - dDepth * (float) i;
+            vertex.Position = DirectX::XMFLOAT3(x, 0.0f, z);
+            vertex.TexC = DirectX::XMFLOAT2(du * j, dv * i);
+            vertex.Normal = DirectX::XMFLOAT3(0.0f, 1.0f, 0.0f);
+            vertex.TangentU = DirectX::XMFLOAT3(1.0f, 0.0f, 0.0f);
+
+            meshData.Vertices.push_back(vertex);
+        }
+    }
+    
+    for (uint32 i = 0; i < m - 1; i++)
+    {
+        for (uint32 j = 0; j < n - 1; j++)
+        {
+            meshData.Indices32.push_back((i + 1) * n + j);
+            meshData.Indices32.push_back(i * n + j);
+            meshData.Indices32.push_back(i * n + j + 1);
+
+            meshData.Indices32.push_back((i + 1) * n + j);
+            meshData.Indices32.push_back(i * n + j + 1);
+            meshData.Indices32.push_back((i + 1) * n + j + 1);
+        }
+    }
+    return meshData;
+}
+
 void GeometryGenerator::Subdivide(MeshData& meshData)
 {
     uint32 triangleCount = meshData.Indices32.size();

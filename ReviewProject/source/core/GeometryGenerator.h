@@ -56,5 +56,6 @@ public:
     MeshData CreateSphere(float radius, uint32 sliceCount, uint32 stackCount);
     MeshData CreateGeosphere(float radius, uint32 numSubdivisions);
     MeshData CreateBox(float width, float height, float depth);
+    MeshData CreateGrid(float width, float depth, uint32 m, uint32 n);
     void Subdivide(MeshData& meshData);
 };
