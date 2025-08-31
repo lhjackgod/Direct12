@@ -4,6 +4,7 @@
 #include <DirectXColors.h>
 #include <array>
 #include <sstream>
+#ifdef BOXAPP
 BoxApp::BoxApp(HINSTANCE hInstance)
     :D3DApp(hInstance)
 {
@@ -288,3 +289,4 @@ void BoxApp::Draw(const GameTimer& gt)
     m_CurrentBackBufferIndex = (m_CurrentBackBufferIndex + 1) % SwapChainBufferCount;
     FlushCommandQueue();
 }
+#endif

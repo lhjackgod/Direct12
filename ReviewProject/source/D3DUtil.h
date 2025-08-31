@@ -12,6 +12,47 @@
 #include <DirectXCollision.h>
 #include <unordered_map>
 
+extern const int gNumFrameResources;
+namespace MathHelper
+{
+    template <typename T>
+    inline T Clamp(T v, T min, T max)
+    {
+        return (v < min) ? min : ((v > max) ? max : v);
+    }
+    inline DirectX::XMFLOAT4X4 Identity4x4()
+    {
+        DirectX::XMFLOAT4X4 result = DirectX::XMFLOAT4X4();
+        for (int i = 0; i < 4; i++)
+        {
+            for (int j = 0; j < 4; j++)
+            {
+                if (i == j)
+                {
+                    result.m[i][j] = 1.0f;
+                }
+                else
+                {
+                    result.m[i][j] = 0.0f;
+                }
+            }
+        }
+        return result;
+    }
+    extern float Pi;
+    inline DirectX::XMMATRIX InverseTanspose(DirectX::CXMMATRIX M)
+    {
+        DirectX::XMMATRIX A = M;
+        A.r[3] = DirectX::XMVectorSet(0.f, 0.f, 0.f, 1.f);
+        DirectX::XMVECTOR det = DirectX::XMMatrixDeterminant(A);
+        return  DirectX::XMMatrixTranspose(DirectX::XMMatrixInverse(&det, A));
+    }
+    inline float frac(float x)
+    {
+        return x - floorf(x);
+    }
+}
+
 namespace d3dUtil
 {
     Microsoft::WRL::ComPtr<ID3D12Resource> CreateDefaultBuffer(
@@ -89,32 +130,32 @@ namespace d3dUtil
             IndexBufferUploader = nullptr;
         }
     };
-}
-namespace MathHelper
-{
-    template <typename T>
-    inline T Clamp(T v, T min, T max)
+    struct Material
     {
-        return (v < min) ? min : ((v > max) ? max : v);
-    }
-    inline DirectX::XMFLOAT4X4 Identity4x4()
+        // 便于查找材质唯一对应名称
+        std::string Name;
+        //本材质的常量缓冲区
+        int MatCBIndex = -1;
+        //漫反射纹理在SRV堆中的索引。在第9章纹理贴图时会用到
+        int DiffuseSrvHeapIndex = -1;
+
+        // 已更新标志(dirty flag, 也作脏标志)表示本材质已有变动，而我们也就需要更新常量缓冲区了。
+        // 由于每个帧资源FrameResource都有一个材质常量缓冲区。所以必须对每个FrameResource都进行更新
+        // 因此当修改某个材质时，应当设置NumFrameDirty = gNumFrameResource，以使每个帧资源都能得到更新
+        int NumFrameDirty = gNumFrameResources;
+        //用于着色的材质常量缓冲区数据
+        DirectX::XMFLOAT4 DiffuseAlbedo = {1.0f, 1.0f, 1.0f, 1.0f};
+        DirectX::XMFLOAT3 FresnelR0 = {0.01f, 0.01f, 0.01f};
+        float Roughness = 0.25f;
+        DirectX::XMFLOAT4X4 MatTransform = MathHelper::Identity4x4();
+    };
+    struct Light
     {
-        DirectX::XMFLOAT4X4 result = DirectX::XMFLOAT4X4();
-        for (int i = 0; i < 4; i++)
-        {
-            for (int j = 0; j < 4; j++)
-            {
-                if (i == j)
-                {
-                    result.m[i][j] = 1.0f;
-                }
-                else
-                {
-                    result.m[i][j] = 0.0f;
-                }
-            }
-        }
-        return result;
-    }
-    extern float Pi;
+        DirectX::XMFLOAT3 Strength = {0.5f, 0.5f, 0.5f}; //光源的颜色
+        float FalloffStart = 1.0f; // 仅供点光源/聚光灯光源使用
+        DirectX::XMFLOAT3 Direction = {0.0f, -1.0f, 0.0f}; // 仅供点光源/聚光灯光源使用
+        float FalloffEnd = 10.0f; // 仅供点光源/聚光灯光源使用
+        DirectX::XMFLOAT3 Position = {0.0f, 0.0f, 0.0f};// 仅供点光源/聚光灯光源使用
+        float SpotPower = 64.0f; // 仅供聚光灯光源使用
+    };
 }

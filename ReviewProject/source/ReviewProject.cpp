@@ -1,6 +1,7 @@
 #include "D3DUtil.h"
-#include "review/ShapesApp.h"
+#include "review/LitWavesApp.h"
 #include "d3dx12.h"
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PSTR cmdLine, int showCmd)
 {
     //为调试版本开启运行时内存检测，方便监督内存泄露的情况
@@ -9,7 +10,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PSTR cmdLine, in
     #endif
     try
     {
-        ShapesApp app(hInstance);
+        LitWavesApp app(hInstance);
         if (!app.Initialize())
             return 0;
         return app.Run();

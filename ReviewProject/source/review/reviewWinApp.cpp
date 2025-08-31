@@ -3,6 +3,7 @@
 #include <DirectXMath.h>
 #include <DirectXColors.h>
 #include "core/UploadBuffer.h"
+#ifdef BEGINAPP
 bool ReviewApp::Initialize()
 {
     if (!D3DApp::Initialize())
@@ -52,3 +53,4 @@ void ReviewApp::Draw(const GameTimer& gt)
     m_CurrentBackBufferIndex = (m_CurrentBackBufferIndex + 1) % SwapChainBufferCount;
     FlushCommandQueue();
 }
+#endif

@@ -93,3 +93,4 @@ namespace d3dUtil
 
 }
 float MathHelper::Pi = 3.1415926f;
+const int gNumFrameResources = 3;

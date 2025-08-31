@@ -1,6 +1,6 @@
 #pragma once
 #include "UploadBuffer.h"
-
+#define MaxLights 16
 struct PassConstant
 {
     DirectX::XMFLOAT4X4 View;
@@ -17,17 +17,29 @@ struct PassConstant
     float FarZ;
     float TotalTime;
     float DeltaTime;
+    DirectX::XMFLOAT4 gAmbientLight;
+
+    d3dUtil::Light gLights[MaxLights];
 };
 struct ObjectConsts
 {
     DirectX::XMFLOAT4X4 World;
+    DirectX::XMFLOAT4X4 TInvWorld;
 };
 struct Vertex
 {
     DirectX::XMFLOAT3 Pos;
-    DirectX::XMFLOAT4 Color;
+    DirectX::XMFLOAT3 Normal;
 };
-const int gNumFrameResources = 3;
+
+struct MaterialConstants
+{
+    DirectX::XMFLOAT4 DiffuseAlbedo = {1.0f, 1.0f, 1.0f, 1.0f};
+    DirectX::XMFLOAT3 FresnelR0 = {0.01f, 0.01f, 0.01f};
+    float Roughness = 0.25f;
+    DirectX::XMFLOAT4X4 MatTransform = MathHelper::Identity4x4();
+};
+
 struct RenderItem
 {
     RenderItem() = default;
@@ -44,7 +56,7 @@ struct RenderItem
     UINT ObjCBIndex  =-1;
     //此渲染项参与绘制的几何体。注意，绘制一个几何体可能会用到多个渲染项
     d3dUtil::MeshGeometry* Geo = nullptr;
-
+    d3dUtil::Material* mat = nullptr;
     //DrawIndexedInstanced方法的参数
     UINT IndexCount = 0;
     UINT StartIndexLocation = 0;
@@ -55,7 +67,7 @@ struct RenderItem
 class FrameResource
 {
 public:
-    FrameResource(ID3D12Device* device, UINT passCount, UINT objectCount);
+    FrameResource(ID3D12Device* device, UINT passCount, UINT objectCount, UINT materialCount);
     FrameResource(const FrameResource&) = delete;
     FrameResource& operator=(const FrameResource) = delete;
     ~FrameResource();
@@ -68,6 +80,9 @@ public:
     //因此每一帧都要有它们自己的常量缓冲区
     std::unique_ptr<UploadBuffer<PassConstant>> PassCB = nullptr;
     std::unique_ptr<UploadBuffer<ObjectConsts>> ObjectCB = nullptr;
+
+    // Material
+    std::unique_ptr<UploadBuffer<MaterialConstants>> MaterialCB = nullptr;
 
     //通过围栏值将命令标记到此围栏点，这使得我们可以检测GPU是否还在使用这些帧资源
     UINT Fence = 0;

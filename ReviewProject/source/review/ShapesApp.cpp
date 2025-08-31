@@ -5,7 +5,7 @@
 
 #include "FrameResource.h"
 #include "core/GeometryGenerator.h"
-
+#ifdef SHAPESAPP
 ShapesApp::ShapesApp(HINSTANCE hInstance)
     :D3DApp(hInstance)
 {
@@ -599,3 +599,4 @@ void ShapesApp::OnMouseUp(WPARAM btnState, int x, int y)
 {
     ReleaseCapture();
 }
+#endif
