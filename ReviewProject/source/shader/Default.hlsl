@@ -1,5 +1,5 @@
 #ifndef NUM_DIR_LIGHTS
-#define NUM_DIR_LIGHTS 1
+#define NUM_DIR_LIGHTS 3
 #endif
 
 #ifndef NUM_POINT_LIGHTS
@@ -10,13 +10,13 @@
 #define NUM_SPOT_LIGHTS 0
 #endif
 
-#define CARTON
 #include "LightingUtils.hlsl"
 
 cbuffer cbPerObject : register(b0)
 {
     float4x4 gWorld;
     float4x4 gWorldInvTranspose;
+    float4x4 gTexTransform;
 };
 
 cbuffer cbMaterial : register(b1)
@@ -50,41 +50,24 @@ cbuffer cbPass : register(b2)
 
 struct VertexIn
 {
-    float3 posL : POSITION;
+    float3 PosL : POSITIONT;
     float3 NormalL : NORMAL;
+    float2 TexC : TEXCOORD;
 };
 
 struct VertexOut
 {
-    float4 PosH : SV_POSITION;
-    float3 PosW : POSITION;
+    float4 PosH : SV_Position;
+    float3 PosW : POSITIONT;
     float3 NormalW : NORMAL;
+    float2 TexC : TEXCOORD;
 };
 
-VertexOut VS(VertexIn vin)
-{
-    VertexOut vout = (VertexOut)0.0f;
-    float4 posW = mul(float4(vin.posL, 1.0f), gWorld);
-    vout.PosW = posW.xyz / posW.w;
-    
-    vout.NormalW = mul(vin.NormalL, (float3x3)gWorldInvTranspose);
-    vout.PosH = mul(posW, gViewProj);
-    return vout;
-}
+Texture2D gDiffuseMap : register(t0);
 
-float4 PS(VertexOut pin) : SV_Target
-{
-    pin.NormalW = normalize(pin.NormalW);
-    float3 toEyeW = normalize(gEyePosW - pin.PosW);
-
-    float4 ambient = gAmbientLight * gDiffuseAlbedo;
-    const float shininess = 1.0f - gRoughness;
-    Material mat = { gDiffuseAlbedo, gFresnelR0, shininess};
-
-    float3 shadowFactor = 1.0f;
-    float4 directLight = ComputeLighting(gLights, mat, pin.PosW, pin.NormalW, toEyeW, shadowFactor);
-
-    float4 litColor = directLight + ambient;
-    litColor.a = gDiffuseAlbedo.a;
-    return litColor;
-}
+SamplerState gsamPointWrap : register(s0);
+SamplerState gsamPointClamp : register(s1);
+SamplerState gsamLinearWrap : register(s2);
+SamplerState gsamLinearClamp : register(s3);
+SamplerState gsamAnisotropicWrap : register(s4);
+SamplerState gsamAnisotropicClamp : register(s5);

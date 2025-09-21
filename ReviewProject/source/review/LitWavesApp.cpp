@@ -4,7 +4,7 @@
 #include <DirectXColors.h>
 
 #include "GeometryGenerator.h"
-#define LITWAVESAPP
+
 #ifdef LITWAVESAPP
 LitWavesApp::LitWavesApp(HINSTANCE hInstance)
     : D3DApp(hInstance)

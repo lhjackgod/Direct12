@@ -1,5 +1,6 @@
 #pragma once
 #include "UploadBuffer.h"
+#include "core/DDSTexttureLoader.h"
 #define MaxLights 16
 struct PassConstant
 {
@@ -25,11 +26,26 @@ struct ObjectConsts
 {
     DirectX::XMFLOAT4X4 World;
     DirectX::XMFLOAT4X4 TInvWorld;
+    DirectX::XMFLOAT4X4 TexTransform;
 };
 struct Vertex
 {
     DirectX::XMFLOAT3 Pos;
     DirectX::XMFLOAT3 Normal;
+    DirectX::XMFLOAT2 TexC;
+};
+
+struct Texture
+{
+    std::string Name;
+
+    std::wstring FileName;
+    Microsoft::WRL::ComPtr<ID3D12Resource> Resource = nullptr;
+    Microsoft::WRL::ComPtr<ID3D12Resource> UploadHeap = nullptr;
+    std::unique_ptr<uint8_t[]> Data;
+    std::vector<D3D12_SUBRESOURCE_DATA> SubResourceData;
+    DirectX::DDS_ALPHA_MODE AlphaMode;
+    bool is_cube;
 };
 
 struct MaterialConstants

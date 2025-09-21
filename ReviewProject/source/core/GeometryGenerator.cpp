@@ -245,33 +245,72 @@ GeometryGenerator::MeshData GeometryGenerator::CreateGeosphere(float radius, uin
 GeometryGenerator::MeshData GeometryGenerator::CreateBox(float width, float height, float depth)
 {
     MeshData meshData;
-    DirectX::XMFLOAT3 pos[8] = {
-        //behine
-        DirectX::XMFLOAT3(-width * 0.5f, -height * 0.5f, depth * 0.5f),
-        DirectX::XMFLOAT3(-width * 0.5f, height * 0.5f, depth * 0.5f),
-        DirectX::XMFLOAT3(width * 0.5f, height * 0.5f, depth * 0.5f),
-        DirectX::XMFLOAT3(width * 0.5f, -height * 0.5f, depth * 0.5f),
-        // front
-        DirectX::XMFLOAT3(-width * 0.5f, -height * 0.5f, -depth * 0.5f),
-        DirectX::XMFLOAT3(-width * 0.5f, height * 0.5f, -depth * 0.5f),
-        DirectX::XMFLOAT3(width * 0.5f, height * 0.5f, -depth * 0.5f),
-        DirectX::XMFLOAT3(width * 0.5f, -height * 0.5f, -depth * 0.5f)
-    };
+    Vertex v[24];
+    float w2 = 0.5f * width;
+    float h2 = 0.5f * height;
+    float d2 = 0.5f * depth;
+    //front
+    v[0] = Vertex(-w2, -h2, -d2, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+    v[1] = Vertex(-w2, h2, -d2, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+    v[2] = Vertex(w2, h2, -d2, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+    v[3] = Vertex(w2, -h2, -d2, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
 
+    //back
+    v[4] = Vertex(-w2, -h2, d2, 0.0f, 0.0f, 1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+    v[5] = Vertex(w2, -h2, d2, 0.0f, 0.0f, 1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+    v[6] = Vertex(w2, h2, d2, 0.0f, 0.0f, 1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+    v[7] = Vertex(-w2, h2, d2, 0.0f, 0.0f, 1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+
+    // left (左面，法向量指向X轴负方向)
+    v[8] = Vertex(-w2, -h2, -d2, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f);  // 左下后
+    v[9] = Vertex(-w2, h2, -d2, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f);  // 左上后
+    v[10] = Vertex(-w2, h2, d2, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f);  // 左上前
+    v[11] = Vertex(-w2, -h2, d2, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 1.0f, 1.0f); // 左下前
+
+    // right (右面，法向量指向X轴正方向)
+    v[12] = Vertex(w2, -h2, d2, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f);   // 右下前
+    v[13] = Vertex(w2, h2, d2, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f);   // 右上前
+    v[14] = Vertex(w2, h2, -d2, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f);  // 右上后
+    v[15] = Vertex(w2, -h2, -d2, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 1.0f, 1.0f); // 右下后
+
+
+    //up (上面，法向量向上)
+    v[16] = Vertex(-w2, h2, -d2, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+    v[17] = Vertex(w2, h2, -d2, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+    v[18] = Vertex(w2, h2, d2, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+    v[19] = Vertex(-w2, h2, d2, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+
+    //down (下面，法向量向下)
+    v[20] = Vertex(-w2, -h2, d2, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+    v[21] = Vertex(w2, -h2, d2, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+    v[22] = Vertex(w2, -h2, -d2, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+    v[23] = Vertex(-w2, -h2, -d2, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+    
+    // 索引数组：每个面2个三角形（6个索引），共6个面，36个索引
     uint32 indices[36] = {
-        0,1,2, 0,2,3, //behine
-        7,6,2, 7,2,3, //right
-        4,5,6, 4,6,7, // front
-        0,1,5, 0,5,4, //right
-        5,1,2, 5,2,6, // top
-        0,4,7, 0,7,3 //bottom
+        // 1. 前面（front，法向量 -z）：v0→v1→v2（三角形1），v0→v2→v3（三角形2）
+        0, 1, 2,    0, 2, 3,
+
+        // 2. 后面（back，法向量 +z）：v4→v5→v6（三角形1），v4→v6→v7（三角形2）
+        4, 5, 6,    4, 6, 7,
+
+        // 3. 左面（left，法向量 -x）：v8→v9→v10（三角形1），v8→v10→v11（三角形2）
+        8, 9, 10,   8, 10, 11,
+
+        // 4. 右面（right，法向量 +x）：v12→v13→v14（三角形1），v12→v14→v15（三角形2）
+        12, 13, 14, 12, 14, 15,
+
+        // 5. 上面（up，法向量 +y）：v16→v17→v18（三角形1），v16→v18→v19（三角形2）
+        16, 17, 18, 16, 18, 19,
+
+        // 6. 下面（down，法向量 -y）：v20→v21→v22（三角形1），v20→v22→v23（三角形2）
+        20, 21, 22, 20, 22, 23
     };
+    
+    
     meshData.Indices32.assign(&indices[0], &indices[36]);
-    meshData.Vertices.resize(8);
-    for (uint32 i = 0; i < 8; i++)
-    {
-        meshData.Vertices[i].Position = pos[i];
-    }
+    meshData.Vertices.assign(&v[0], &v[24]);
+    
     return meshData;
 }
 
