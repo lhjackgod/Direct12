@@ -286,25 +286,31 @@ GeometryGenerator::MeshData GeometryGenerator::CreateBox(float width, float heig
     v[22] = Vertex(w2, -h2, -d2, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f);
     v[23] = Vertex(-w2, -h2, -d2, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f);
     
-    // 索引数组：每个面2个三角形（6个索引），共6个面，36个索引
-    uint32 indices[36] = {
-        // 1. 前面（front，法向量 -z）：v0→v1→v2（三角形1），v0→v2→v3（三角形2）
-        0, 1, 2,    0, 2, 3,
+    uint32_t indices[36] =
+{
+        // Front face (Normal: 0,0,-1)
+        0, 2, 1,    // Triangle 1: v0-v2-v1
+        0, 3, 2,    // Triangle 2: v0-v3-v2
 
-        // 2. 后面（back，法向量 +z）：v4→v5→v6（三角形1），v4→v6→v7（三角形2）
-        4, 5, 6,    4, 6, 7,
+        // Back face (Normal: 0,0,1)
+        4, 6, 5,    // Triangle 1: v4-v6-v5
+        4, 7, 6,    // Triangle 2: v4-v7-v6
 
-        // 3. 左面（left，法向量 -x）：v8→v9→v10（三角形1），v8→v10→v11（三角形2）
-        8, 9, 10,   8, 10, 11,
+        // Left face (Normal: -1,0,0)
+        8, 10, 9,   // Triangle 1: v8-v10-v9
+        8, 11, 10,  // Triangle 2: v8-v11-v10
 
-        // 4. 右面（right，法向量 +x）：v12→v13→v14（三角形1），v12→v14→v15（三角形2）
-        12, 13, 14, 12, 14, 15,
+        // Right face (Normal: 1,0,0)
+        12, 14, 13, // Triangle 1: v12-v14-v13
+        12, 15, 14, // Triangle 2: v12-v15-v14
 
-        // 5. 上面（up，法向量 +y）：v16→v17→v18（三角形1），v16→v18→v19（三角形2）
-        16, 17, 18, 16, 18, 19,
+        // Up face (Normal: 0,1,0)
+        16, 18, 17, // Triangle 1: v16-v18-v17
+        16, 19, 18, // Triangle 2: v16-v19-v18
 
-        // 6. 下面（down，法向量 -y）：v20→v21→v22（三角形1），v20→v22→v23（三角形2）
-        20, 21, 22, 20, 22, 23
+        // Down face (Normal: 0,-1,0)
+        20, 22, 21, // Triangle 1: v20-v22-v21
+        20, 23, 22  // Triangle 2: v20-v23-v22
     };
     
     

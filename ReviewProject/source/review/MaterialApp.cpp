@@ -4,10 +4,17 @@
 #include <array>
 #include "core/GeometryGenerator.h"
 #include "core/DDSTexttureLoader.h"
+#include "DirectXColors.h"
+MaterialApp::MaterialApp(HINSTANCE hInstace)
+    :D3DApp(hInstace)
+{
+
+}
 bool MaterialApp::Initialize()
 {
     if (!D3DApp::Initialize())
         return false;
+    m_CommandList->Reset(m_CommandAllocator.Get(), nullptr);
     CreateGeometries();
     LoadDefaultWhiteTexture();
     LoadTextureResources();
@@ -18,8 +25,21 @@ bool MaterialApp::Initialize()
     CreateFrameResources();
     CreateShaderAndInputLayout();
     createRootSignature();
-    
+    CreatePSO();
+
+    ThrowIfFailed(m_CommandList->Close());
+    ID3D12CommandList* cmdLists[] = { m_CommandList.Get() };
+    m_CommandQueue->ExecuteCommandLists(_countof(cmdLists), cmdLists);
+    FlushCommandQueue();
 }
+
+void MaterialApp::OnResize()
+{
+    D3DApp::OnResize();
+    DirectX::XMMATRIX proj = DirectX::XMMatrixPerspectiveFovLH(0.5f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
+    DirectX::XMStoreFloat4x4(&m_Projection, proj);
+}
+
 
 float MaterialApp::GetHillHeight(float x, float z) const
 {
@@ -53,11 +73,11 @@ void MaterialApp::CreateGeometries()
         landVertex[i] = std::move(v);
     }
     //land geometry
-    std::unique_ptr<d3dUtil::MeshGeometry> landGeo;
+    std::unique_ptr<d3dUtil::MeshGeometry> landGeo = std::make_unique<d3dUtil::MeshGeometry>();
     UINT vbByteSize = sizeof(Vertex) * landVertex.size();
     UINT ibByteSize = sizeof(uint16_t) * land.GetIndices16().size();
     ThrowIfFailed(D3DCreateBlob(vbByteSize, landGeo->VertexBufferCPU.GetAddressOf()));
-    ThrowIfFailed(D3DCreateBlob(ibByteSize, landGeo->IndexBufferCPU.GetAddressOf));
+    ThrowIfFailed(D3DCreateBlob(ibByteSize, landGeo->IndexBufferCPU.GetAddressOf()));
     CopyMemory(landGeo->VertexBufferCPU->GetBufferPointer(), landVertex.data(), vbByteSize);
     CopyMemory(landGeo->IndexBufferCPU->GetBufferPointer(), land.GetIndices16().data(), ibByteSize);
     landGeo->Name = "land";
@@ -65,7 +85,6 @@ void MaterialApp::CreateGeometries()
         vbByteSize, landGeo->VertexBufferUploader);
     landGeo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(m_Device.Get(), m_CommandList.Get(), landGeo->IndexBufferCPU->GetBufferPointer(),
         ibByteSize, landGeo->IndexBufferUploader);
-    landGeo->DisposeUploaders();
     landGeo->VertexByteStride = sizeof(Vertex);
     landGeo->VertexByteSize = vbByteSize;
     landGeo->IndexBufferByteSize = ibByteSize;
@@ -89,7 +108,7 @@ void MaterialApp::CreateGeometries()
     }
     
     // box geometry
-    std::unique_ptr<d3dUtil::MeshGeometry> boxGeom;
+    std::unique_ptr<d3dUtil::MeshGeometry> boxGeom = std::make_unique<d3dUtil::MeshGeometry>();
     vbByteSize = sizeof(Vertex) * boxVertex.size();
     ibByteSize = sizeof(uint16_t) * box.GetIndices16().size();
     ThrowIfFailed(D3DCreateBlob(vbByteSize, boxGeom->VertexBufferCPU.GetAddressOf()));
@@ -106,7 +125,6 @@ void MaterialApp::CreateGeometries()
     boxGeom->VertexByteSize = vbByteSize;
     boxGeom->IndexBufferByteSize = ibByteSize;
     boxGeom->IndexFormat = DXGI_FORMAT_R16_UINT;
-    boxGeom->DisposeUploaders();
     d3dUtil::SubmeshGeometry boxSub;
     boxSub.IndexCount = box.GetIndices16().size();
     boxSub.StartIndexLocation = 0;
@@ -116,7 +134,7 @@ void MaterialApp::CreateGeometries()
 
     // sea Geometry
     m_SeaUploaderBuffer = std::make_unique<UploadBuffer<Vertex>>(m_Device.Get(), land.Vertices.size(), false);
-    std::unique_ptr<d3dUtil::MeshGeometry> seaGeo;
+    std::unique_ptr<d3dUtil::MeshGeometry> seaGeo = std::make_unique<d3dUtil::MeshGeometry>();
     vbByteSize = sizeof(Vertex) * land.Vertices.size();
     ibByteSize = sizeof(uint16_t) * land.GetIndices16().size();
     ThrowIfFailed(D3DCreateBlob(vbByteSize, seaGeo->VertexBufferCPU.GetAddressOf()));
@@ -126,8 +144,7 @@ void MaterialApp::CreateGeometries()
     seaGeo->Name = "sea";
     seaGeo->VertexBufferGPU = (ID3D12Resource*)*m_SeaUploaderBuffer;
     seaGeo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(m_Device.Get(), m_CommandList.Get(), land.GetIndices16().data(),
-        ibByteSize, landGeo->IndexBufferUploader);
-    seaGeo->DisposeUploaders();
+        ibByteSize, seaGeo->IndexBufferUploader);
     d3dUtil::SubmeshGeometry seaSub;
     seaSub.IndexCount = land.GetIndices16().size();
     seaSub.StartIndexLocation = 0;
@@ -141,7 +158,7 @@ void MaterialApp::CreateMaterial()
     std::unique_ptr<d3dUtil::Material> grass = std::make_unique<d3dUtil::Material>();
     grass->Name = "land";
     grass->MatCBIndex = 0;
-    grass->DiffuseSrvHeapIndex = 1;
+    grass->DiffuseSrvHeapIndex = 0;
     grass->DiffuseAlbedo = DirectX::XMFLOAT4(0.2f, 0.6f, 0.2f, 1.0f);
     grass->FresnelR0 = DirectX::XMFLOAT3(0.01f, 0.01f, 0.01f);
     grass->Roughness = 0.125f;
@@ -150,7 +167,7 @@ void MaterialApp::CreateMaterial()
     auto water = std::make_unique<d3dUtil::Material>();
     water->Name = "sea";
     water->MatCBIndex = 1;
-    water->DiffuseSrvHeapIndex = 1;
+    water->DiffuseSrvHeapIndex = 0;
     water->DiffuseAlbedo = DirectX::XMFLOAT4(0.0f, 0.2f, 0.6f, 1.0f);
     water->FresnelR0 = DirectX::XMFLOAT3(0.1f, 0.1f, 0.1f);
     water->Roughness = 0.0f;
@@ -206,7 +223,7 @@ void MaterialApp::CreateRenderItems()
     boxRitem->StartIndexLocation = boxRitem->Geo->DrawArgs["box"].StartIndexLocation;
     boxRitem->BaseVertexLocation = boxRitem->Geo->DrawArgs["box"].BaseVertexLocation;
     boxRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-
+    
     m_RenderItems.push_back(std::move(landRitem));
     m_RenderItems.push_back(std::move(seaRitem));
     m_RenderItems.push_back(std::move(boxRitem));
@@ -409,7 +426,7 @@ void MaterialApp::LoadTextureResources()
         woodCrateTex->SubResourceData.data());
 
     pBarrier = CD3DX12_RESOURCE_BARRIER::Transition(woodCrateTex->Resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST,
-        D3D12_RESOURCE_STATE_COMMON);
+        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     
     m_CommandList->ResourceBarrier(1, &pBarrier);
     m_Textures[woodCrateTex->Name] = std::move(woodCrateTex);
@@ -479,7 +496,7 @@ void MaterialApp::LoadDefaultWhiteTexture()
         defaultWhiteTex->SubResourceData.size(),
         defaultWhiteTex->SubResourceData.data());
     pBarrier = CD3DX12_RESOURCE_BARRIER::Transition(defaultWhiteTex->Resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST,
-        D3D12_RESOURCE_STATE_COMMON);
+        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     m_CommandList->ResourceBarrier(1, &pBarrier);
     m_Textures[defaultWhiteTex->Name] = std::move(defaultWhiteTex);
 }
@@ -489,13 +506,312 @@ void MaterialApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std:
     for (size_t i = 0; i < ritems.size(); i++)
     {
         auto ri = ritems[i];
-        cmdList->IASetVertexBuffers(0, 1, &ri->Geo->VertexBufferView());
-        cmdList->IASetIndexBuffer(&ri->Geo->IndexBufferView());
+        D3D12_VERTEX_BUFFER_VIEW vertexBufferView = ri->Geo->VertexBufferView();
+        D3D12_INDEX_BUFFER_VIEW indexBufferView = ri->Geo->IndexBufferView();
+        cmdList->IASetVertexBuffers(0, 1, &vertexBufferView);
+        cmdList->IASetIndexBuffer(&indexBufferView);
         cmdList->IASetPrimitiveTopology(ri->PrimitiveType);
 
         CD3DX12_GPU_DESCRIPTOR_HANDLE tex(m_SRVDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
         tex.Offset(ri->mat->DiffuseSrvHeapIndex, m_CbvSrvUavDescriptorSize);
-        
         cmdList->SetGraphicsRootDescriptorTable(0, tex);
+        ID3D12Resource* objResource = (ID3D12Resource*)*m_CurrentFrameResource->ObjectCB.get();
+        ID3D12Resource* matResource = (ID3D12Resource*)*m_CurrentFrameResource->MaterialCB.get();
+        D3D12_GPU_VIRTUAL_ADDRESS objGPU = objResource->GetGPUVirtualAddress() + ri->ObjCBIndex * d3dUtil::CalcConstBufferByteSize(sizeof(ObjectConsts));
+        D3D12_GPU_VIRTUAL_ADDRESS matGPU = matResource->GetGPUVirtualAddress() + ri->mat->MatCBIndex * d3dUtil::CalcConstBufferByteSize(sizeof(MaterialConstants));
+        cmdList->SetGraphicsRootConstantBufferView(1, objGPU);
+        cmdList->SetGraphicsRootConstantBufferView(2, matGPU);
+        cmdList->DrawIndexedInstanced(ri->IndexCount, 1, ri->StartIndexLocation, ri->BaseVertexLocation, 0);
     }
+}
+
+void MaterialApp::CreatePSO()
+{
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc{};
+    psoDesc.pRootSignature = m_RootSignature.Get();
+    psoDesc.VS = CD3DX12_SHADER_BYTECODE(m_VSShader.Get());
+    psoDesc.PS = CD3DX12_SHADER_BYTECODE(m_PSShader.Get());
+    psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+    psoDesc.SampleMask = UINT_MAX;
+    psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+    psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+    psoDesc.InputLayout = {m_InputLayout.data(), (UINT)m_InputLayout.size()};
+    psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    psoDesc.NumRenderTargets = 1;
+    psoDesc.RTVFormats[0] = m_BackBufferFormat;
+    psoDesc.DSVFormat = m_DepthStencilFormat;
+    psoDesc.SampleDesc.Count = m4xMsaaState ? 4 : 1;
+    psoDesc.SampleDesc.Quality = m4xMsaaState ? m4xMsaaQuality - 1 : 0;
+    psoDesc.NodeMask = 0;
+    ComPtr<ID3D12PipelineState> pso;
+    ThrowIfFailed(m_Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(pso.GetAddressOf())));
+    m_PSOs["material"] = std::move(pso);
+}
+
+void MaterialApp::Update(const GameTimer& gt)
+{
+    m_CurrentFrameIndex = (m_CurrentFrameIndex + 1) % gNumFrameResources;
+    m_CurrentFrameResource = m_FrameResources[m_CurrentFrameIndex].get();
+    if (m_CurrentFrameResource->Fence != 0 && m_Fence->GetCompletedValue() < m_CurrentFrameResource->Fence)
+    {
+        HANDLE event = CreateEventEx(nullptr, nullptr, 0, EVENT_ALL_ACCESS);
+        m_Fence->SetEventOnCompletion(m_CurrentFrameResource->Fence, event);
+        WaitForSingleObject(event, INFINITE);
+        CloseHandle(event);
+    }
+    float x = m_Radius * sinf(m_Phi) * cosf(m_Theta);
+    float y = m_Radius * cosf(m_Phi);
+    float z = m_Radius * sinf(m_Phi) * sinf(m_Theta);
+    DirectX::XMVECTOR pos = DirectX::XMVectorSet(x, y, z, 1.0f);
+    DirectX::XMVECTOR target = DirectX::XMVectorZero();
+    DirectX::XMVECTOR up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+
+    DirectX::XMMATRIX view = DirectX::XMMatrixLookAtLH(pos, target, up);
+    DirectX::XMStoreFloat4x4(&m_View, view);
+    DirectX::XMStoreFloat3(&m_Eyepos, pos);
+
+    UpdateFramresouce(gt);
+    UpdateObj(gt);
+    UpdateMaterial(gt);
+    UpdateSea(gt);
+}
+
+void MaterialApp::UpdateObj(const GameTimer& gt)
+{
+    for (auto& r : m_RenderItems)
+    {
+        if (r->NumFrameDirty > 0)
+        {
+            r->NumFrameDirty--;
+            ObjectConsts objConstData;
+            objConstData.World = r->World;
+            DirectX::XMMATRIX world = DirectX::XMLoadFloat4x4(&r->World);
+            DirectX::XMMATRIX invtworld = MathHelper::InverseTanspose(world);
+            DirectX::XMFLOAT4X4 w;
+            DirectX::XMStoreFloat4x4(&w, invtworld);
+            objConstData.TInvWorld = w;
+            
+            DirectX::XMStoreFloat4x4(&w, invtworld);
+            m_CurrentFrameResource->ObjectCB->CopyData(r->ObjCBIndex, objConstData);
+        }
+    }
+}
+
+void MaterialApp::UpdateFramresouce(const GameTimer& gt)
+{
+    PassConstant passCB;
+
+    DirectX::XMMATRIX view = DirectX::XMLoadFloat4x4(&m_View);
+    DirectX::XMMATRIX proj = DirectX::XMLoadFloat4x4(&m_Projection);
+
+    DirectX::XMMATRIX viewProj = DirectX::XMMatrixMultiply(view, proj);
+
+    DirectX::XMVECTOR viewDeter = DirectX::XMMatrixDeterminant(view);
+    DirectX::XMMATRIX invView = DirectX::XMMatrixInverse(&viewDeter, view);
+
+    DirectX::XMVECTOR projDeter = DirectX::XMMatrixDeterminant(proj);
+    DirectX::XMMATRIX invProj = DirectX::XMMatrixInverse(&projDeter, proj);
+    
+    DirectX::XMVECTOR viewProjDeter = DirectX::XMMatrixDeterminant(viewProj);
+    DirectX::XMMATRIX invViewProj = DirectX::XMMatrixInverse(&viewProjDeter, viewProj);
+    
+    DirectX::XMStoreFloat4x4(&passCB.View, DirectX::XMMatrixTranspose(view));
+    DirectX::XMStoreFloat4x4(&passCB.InvView, DirectX::XMMatrixTranspose(invView));
+    DirectX::XMStoreFloat4x4(&passCB.Proj, DirectX::XMMatrixTranspose(proj));
+    DirectX::XMStoreFloat4x4(&passCB.InvProj, DirectX::XMMatrixTranspose(invProj));
+    DirectX::XMStoreFloat4x4(&passCB.ViewProj, DirectX::XMMatrixTranspose(viewProj));
+    DirectX::XMStoreFloat4x4(&passCB.InvViewProj, DirectX::XMMatrixTranspose(invViewProj));
+    passCB.EyePosW = m_Eyepos;
+    passCB.RenderTargetSize = DirectX::XMFLOAT2(static_cast<float>(m_ClientWidth), static_cast<float>(m_ClientHeight));
+    passCB.InvRenderTargetSize = DirectX::XMFLOAT2(static_cast<float>(1.0f / m_ClientWidth), static_cast<float>(1.0f / m_ClientHeight));
+    passCB.NearZ = 1.0f;
+    passCB.FarZ = 1000.0f;
+    passCB.TotalTime = gt.TotalTime();
+    passCB.DeltaTime = gt.DeltaTime();
+    DirectX::XMStoreFloat4(&passCB.gAmbientLight, DirectX::XMVectorSet(0.2f, 0.2f, 0.2f, 1.0f));
+
+    float sunX = 1.0f * sinf(m_SunPhi) * cosf(m_SunTheta);
+    float sunY = 1.0f * cosf(m_SunPhi);
+    float sunZ = 1.0f * sinf(m_SunTheta) * sinf(m_SunPhi);
+    DirectX::XMVECTOR lightDir = DirectX::XMVectorSet(-sunX, -sunY, -sunZ, 0.0f);
+    DirectX::XMStoreFloat3(&passCB.gLights[0].Direction, lightDir);
+    passCB.gLights[0].Strength = {1.0f, 1.0f, 0.9f};
+    m_CurrentFrameResource->PassCB->CopyData(0, passCB);
+}
+
+void MaterialApp::UpdateMaterial(const GameTimer& gt)
+{
+    for (auto& mat : m_Materials)
+    {
+        d3dUtil::Material* pMat = mat.second.get();
+        if (pMat->NumFrameDirty > 0)
+        {
+            pMat->NumFrameDirty --;
+            MaterialConstants matC;
+            matC.DiffuseAlbedo = pMat->DiffuseAlbedo;
+            matC.Roughness = pMat->Roughness;
+            matC.FresnelR0 = pMat->FresnelR0;
+            matC.MatTransform = pMat->MatTransform;
+            m_CurrentFrameResource->MaterialCB->CopyData(pMat->MatCBIndex, matC);
+        }
+    }
+}
+
+DirectX::XMFLOAT3 MaterialApp::calculateNormal(float amplitude, float waveSpeed, float speed, float time, DirectX::XMFLOAT2 direction, DirectX::XMFLOAT2 pos_xy)
+{
+    DirectX::XMFLOAT3 normal = DirectX::XMFLOAT3(0.0f, 0.0f, 1.0f);
+    float w = 2.0f / waveSpeed;
+    float phi = speed * w;
+    float k = cosf((direction.x * pos_xy.x + direction.y * pos_xy.y) * w + time * phi);
+        
+    float x = -1.0f * amplitude * w * direction.x * k;
+    float z = -1.0f * amplitude * w * direction.y * k;
+    return {x, 1.0f, z};
+}
+
+float MaterialApp::CalculateWaveHeight(float amplitude, float waveSpeed, float speed, float time, DirectX::XMFLOAT2 direction, DirectX::XMFLOAT2 pos_xy)
+{
+    float w = 2.0f / waveSpeed;
+    float phi = speed * w;
+    float dDotPos = direction.x * pos_xy.x + direction.y * pos_xy.y;
+    float y = amplitude * sinf(w * dDotPos + time * phi);
+    return y;
+}
+
+
+
+void MaterialApp::UpdateSea(const GameTimer& gt)
+{
+    // 从原始网格数据获取顶点数量
+    GeometryGenerator geoGen;
+    GeometryGenerator::MeshData sea = geoGen.CreateGrid(160.0f, 160.0f, 50, 50);
+
+    WaveParams waveParams;
+
+    //然后根据数据去修改
+    float time = gt.TotalTime();
+    UINT vIdx = 0;
+    for (auto& vv : sea.Vertices)
+    {
+        Vertex v;
+        v.Pos = vv.Position;
+        v.Normal = vv.Normal;
+        DirectX::XMFLOAT2 seed;
+        seed.x = MathHelper::frac(v.Pos.x * 0.1234f + v.Pos.z * 0.5678f);
+        seed.y = MathHelper::frac(v.Pos.x * 0.8765f - v.Pos.z * 0.4321f);
+        for (UINT i = 0; i <3; i++)
+        {
+            float seedOffset = static_cast<float>(i) * 0.333f;
+            DirectX::XMFLOAT2 waveSeed;
+            waveSeed.x = MathHelper::frac(seed.x + seedOffset);
+            waveSeed.y = MathHelper::frac(seed.y + seedOffset * 1.7f);
+            
+            float amplitude = waveParams.A_min + 
+                (waveParams.A_max - waveParams.A_min) * waveSeed.x;
+            float waveLength = waveParams.WaveLength_min + 
+                (waveParams.WaveLength_max - waveParams.WaveLength_min) * waveSeed.y;
+            float speed = waveParams.Speed_min + 
+                (waveParams.Speed_max - waveParams.Speed_min) * 
+                MathHelper::frac(waveSeed.x + waveSeed.y);
+            
+            // 生成波浪方向
+            float angle = waveSeed.x * DirectX::XM_2PI;
+            DirectX::XMFLOAT2 direction(cosf(angle), sinf(angle));
+            DirectX::XMFLOAT2 pos_xy = {v.Pos.x, v.Pos.z};
+            
+            // 累加波浪高度
+            v.Pos.y += CalculateWaveHeight(amplitude, waveLength, speed, 
+                                          time, direction, pos_xy);
+            
+            // 累加法线偏移
+            DirectX::XMFLOAT3 deltaNormal = calculateNormal(amplitude, waveLength, 
+                                                           speed, time, direction, pos_xy);
+            v.Normal.x += deltaNormal.x;
+            v.Normal.z += deltaNormal.z;
+            v.Normal.y = 1.0f;
+        }
+        DirectX::XMVECTOR n = DirectX::XMLoadFloat3(&v.Normal);
+        n = DirectX::XMVector3Normalize(n);
+        DirectX::XMStoreFloat3(&v.Normal, n);
+        m_SeaUploaderBuffer->CopyData(vIdx, v);
+        ++vIdx;
+    }
+}
+
+
+void MaterialApp::OnMouseDown(WPARAM btnState, int x, int y)
+{
+    m_MousePos = {x, y};
+    SetCapture(mhMainWnd);
+}
+void MaterialApp::OnMouseMove(WPARAM btnState, int x, int y)
+{
+    if (btnState & MK_LBUTTON)
+    {
+        float dx = DirectX::XMConvertToRadians(0.25f * static_cast<float>(x - m_MousePos.x));
+        float dy = DirectX::XMConvertToRadians(0.25f * static_cast<float>(y - m_MousePos.y));
+
+        m_Phi += dy;
+        m_Theta += dx;
+        m_Phi = MathHelper::Clamp(m_Phi, 0.1f, MathHelper::Pi - 0.1f);
+    }
+    else if (btnState & MK_RBUTTON)
+    {
+        float dx = 0.005f * static_cast<float>(x - m_MousePos.x);
+        float dy = 0.005f * static_cast<float>(y - m_MousePos.y);
+        m_Radius += (dx - dy);
+        m_Radius = MathHelper::Clamp(m_Radius, 3.0f, 100.0f);
+    }
+    m_MousePos = {x, y};
+}
+void MaterialApp::OnMouseUp(WPARAM btnState, int x, int y)
+{
+    ReleaseCapture();
+}
+
+ 
+
+
+void MaterialApp::Draw(const GameTimer& gt)
+{
+    ID3D12CommandAllocator* alloc = m_CurrentFrameResource->CmdListAlloc.Get();
+    ThrowIfFailed(alloc->Reset());
+    ID3D12PipelineState* pso = m_PSOs["material"].Get();
+    ThrowIfFailed(m_CommandList->Reset(alloc, pso));
+
+    ID3D12Resource* CurrentFrame = CurrentBackBuffer();
+    D3D12_CPU_DESCRIPTOR_HANDLE FrameHandle = CurrentBackBufferHandle();
+    D3D12_CPU_DESCRIPTOR_HANDLE DepthHandle = DepthStencilView();
+    CD3DX12_RESOURCE_BARRIER pBarrier = CD3DX12_RESOURCE_BARRIER::Transition(CurrentFrame, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+    m_CommandList->ResourceBarrier(1, &pBarrier);
+    m_CommandList->OMSetRenderTargets(1, &FrameHandle, true, &DepthHandle);
+    m_CommandList->RSSetViewports(1, &m_ViewPort);
+    m_CommandList->RSSetScissorRects(1, &m_ScissorRect);
+    
+    m_CommandList->ClearRenderTargetView(FrameHandle, DirectX::Colors::LightSteelBlue, 0, nullptr);
+    m_CommandList->ClearDepthStencilView(DepthHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
+
+    ID3D12DescriptorHeap* heaps[] = { m_SRVDescriptorHeap.Get() };
+    m_CommandList->SetDescriptorHeaps(1, heaps);
+    m_CommandList->SetGraphicsRootSignature(m_RootSignature.Get());
+    ID3D12Resource* FrameConstResource = (ID3D12Resource*)*m_CurrentFrameResource->PassCB.get();
+    D3D12_GPU_VIRTUAL_ADDRESS pFrameResource = FrameConstResource->GetGPUVirtualAddress();
+    m_CommandList->SetGraphicsRootConstantBufferView(3, pFrameResource);
+    m_Opaques.clear();
+    for (int i = 0; i < m_RenderItems.size(); ++i)
+    {
+        m_Opaques.push_back(m_RenderItems[i].get());
+    }
+    DrawRenderItems(m_CommandList.Get(), m_Opaques);
+
+    pBarrier = CD3DX12_RESOURCE_BARRIER::Transition(CurrentFrame, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+    m_CommandList->ResourceBarrier(1, &pBarrier);
+    ThrowIfFailed(m_CommandList->Close());
+
+    ID3D12CommandList* cmdLists[] = {m_CommandList.Get()};
+    m_CommandQueue->ExecuteCommandLists(_countof(cmdLists), cmdLists);
+    ThrowIfFailed(m_SwapChain->Present(1, 0));
+    m_CurrentBackBufferIndex = (m_CurrentBackBufferIndex + 1) % SwapChainBufferCount;
+    m_CurrentFrameResource->Fence = ++m_CurrentFence;
+    m_CommandQueue->Signal(m_Fence.Get(), m_CurrentFence);
 }

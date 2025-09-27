@@ -1,5 +1,5 @@
 #ifndef NUM_DIR_LIGHTS
-#define NUM_DIR_LIGHTS 3
+#define NUM_DIR_LIGHTS 1
 #endif
 
 #ifndef NUM_POINT_LIGHTS
@@ -50,7 +50,7 @@ cbuffer cbPass : register(b2)
 
 struct VertexIn
 {
-    float3 PosL : POSITIONT;
+    float3 PosL : POSITION;
     float3 NormalL : NORMAL;
     float2 TexC : TEXCOORD;
 };

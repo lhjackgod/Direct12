@@ -119,7 +119,6 @@ float3 ComputeSpotLight(Light L, Material mat, float3 pos, float3 normal, float3
 float4 ComputeLighting(Light gLights[MaxLights], Material mat, float3 pos, float3 normal, float3 toEye, float3 shadowFactor)
 {
     float3 result = 0.0f;
-    int i = 0;
     
 #if (NUM_DIR_LIGHTS > 0)
     for (int i = 0; i < NUM_DIR_LIGHTS; i++)
