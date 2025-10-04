@@ -27,8 +27,8 @@ D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(483,40): w
 D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(533,122): warning C4267: “参数”: 从“size_t”转换到“UINT”，可能丢失数据
 D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(533,19): warning C4244: “初始化”: 从“UINT64”转换到“UINT”，可能丢失数据
 D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(551,46): warning C4267: “参数”: 从“size_t”转换到“UINT”，可能丢失数据
-D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(646,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
-D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(892,37): warning C4244: “=”: 从“UINT64”转换到“UINT”，可能丢失数据
+D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(647,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(895,37): warning C4244: “=”: 从“UINT64”转换到“UINT”，可能丢失数据
 C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.36.32532\include\memory(3465,56): warning C4267: “参数”: 从“size_t”转换到“UINT”，可能丢失数据
 D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(137,32): message : 查看对正在编译的函数 模板 实例化“std::unique_ptr<UploadBuffer<Vertex>,std::default_delete<UploadBuffer<Vertex>>> std::make_unique<UploadBuffer<Vertex>,T*,unsigned __int64,bool,0>(T *&&,unsigned __int64 &&,bool &&)”的引用
           with

@@ -69,7 +69,7 @@ void MaterialApp::CreateGeometries()
         Vertex v;
         v.Pos = land.Vertices[i].Position;
         v.Pos.y = GetHillHeight(v.Pos.x, v.Pos.z);
-        v.Normal = GetHillsNormal(v.Pos.x, v.Pos.z);
+        v.Normal = land.Vertices[i].Normal;
         v.TexC = land.Vertices[i].TexC;
         landVertex[i] = std::move(v);
     }
@@ -158,7 +158,7 @@ void MaterialApp::CreateGeometries()
     CopyMemory(seaGeo->IndexBufferCPU->GetBufferPointer(), land.GetIndices16().data(), ibByteSize);
     seaGeo->Name = "sea";
     seaGeo->VertexBufferGPU = (ID3D12Resource*)*m_SeaUploaderBuffer;
-    seaGeo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(m_Device.Get(), m_CommandList.Get(), seaGeo->IndexBufferCPU.Get(),
+    seaGeo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(m_Device.Get(), m_CommandList.Get(), seaGeo->IndexBufferCPU->GetBufferPointer(),
         ibByteSize, seaGeo->IndexBufferUploader);
     seaGeo->VertexByteStride = sizeof(Vertex);
     seaGeo->VertexByteSize = sizeof(Vertex) * landVertex.size();
@@ -625,10 +625,12 @@ void MaterialApp::Update(const GameTimer& gt)
     DirectX::XMStoreFloat4x4(&m_View, view);
     DirectX::XMStoreFloat3(&m_Eyepos, pos);
 
+    AnimateMaterials(gt);
     UpdateFramresouce(gt);
     UpdateObj(gt);
     UpdateMaterial(gt);
-    //UpdateSea(gt);
+    UpdateSea(gt);
+
 }
 
 void MaterialApp::UpdateObj(const GameTimer& gt)
@@ -709,7 +711,8 @@ void MaterialApp::UpdateMaterial(const GameTimer& gt)
             matC.DiffuseAlbedo = pMat->DiffuseAlbedo;
             matC.Roughness = pMat->Roughness;
             matC.FresnelR0 = pMat->FresnelR0;
-            matC.MatTransform = pMat->MatTransform;
+            DirectX::XMMATRIX pM = DirectX::XMLoadFloat4x4(&pMat->MatTransform);
+            DirectX::XMStoreFloat4x4(&matC.MatTransform, DirectX::XMMatrixTranspose(pM));
             m_CurrentFrameResource->MaterialCB->CopyData(pMat->MatCBIndex, matC);
         }
     }
@@ -876,7 +879,7 @@ void MaterialApp::Draw(const GameTimer& gt)
     m_Opaques.clear();
     for (int i = 0; i < m_RenderItems.size(); ++i)
     {
-        if (!i) continue;
+        if (i == 0) continue;
         m_Opaques.push_back(m_RenderItems[i].get());
     }
     DrawRenderItems(m_CommandList.Get(), m_Opaques);
