@@ -176,7 +176,7 @@ void MaterialApp::CreateMaterial()
     std::unique_ptr<d3dUtil::Material> grass = std::make_unique<d3dUtil::Material>();
     grass->Name = "land";
     grass->MatCBIndex = 0;
-    grass->DiffuseSrvHeapIndex = 1;
+    grass->DiffuseSrvHeapIndex = 3;
     grass->DiffuseAlbedo = DirectX::XMFLOAT4(0.2f, 0.6f, 0.2f, 1.0f);
     grass->FresnelR0 = DirectX::XMFLOAT3(0.01f, 0.01f, 0.01f);
     grass->Roughness = 0.125f;
@@ -186,7 +186,7 @@ void MaterialApp::CreateMaterial()
     water->Name = "sea";
     water->MatCBIndex = 1;
     water->DiffuseSrvHeapIndex = 2;
-    water->DiffuseAlbedo = DirectX::XMFLOAT4(0.0f, 0.2f, 0.6f, 1.0f);
+    water->DiffuseAlbedo = DirectX::XMFLOAT4(0.0f, 0.2f, 0.6f, 0.6f);
     water->FresnelR0 = DirectX::XMFLOAT3(0.1f, 0.1f, 0.1f);
     water->Roughness = 0.0f;
     
@@ -345,8 +345,13 @@ void MaterialApp::CreateShaderAndInputLayout()
         {"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
         {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}
     };
+    const D3D_SHADER_MACRO defines[] = {
+        {"FOG", "1"},
+        {"ALPHA_TEST", "1"},
+        {nullptr, nullptr}
+    };
     m_VSShader = d3dUtil::CompileShader(L"source/shader/Texture.usf", nullptr, "VS", "vs_5_0");
-    m_PSShader = d3dUtil::CompileShader(L"source/shader/Texture.usf", nullptr, "PS", "ps_5_0");
+    m_PSShader = d3dUtil::CompileShader(L"source/shader/Texture.usf", defines, "PS", "ps_5_0");
 }
 
 void MaterialApp::createRootSignature()
@@ -379,7 +384,7 @@ void MaterialApp::CreateSRVDescriptorHeap()
 {
     D3D12_DESCRIPTOR_HEAP_DESC srvdesc{};
     srvdesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-    srvdesc.NumDescriptors = 3;
+    srvdesc.NumDescriptors = 4;
     srvdesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
     srvdesc.NodeMask = 0;
     ThrowIfFailed(m_Device->CreateDescriptorHeap(&srvdesc, IID_PPV_ARGS(m_SRVDescriptorHeap.GetAddressOf())));
@@ -414,6 +419,12 @@ void MaterialApp::CreateSRVView()
     srvDesc.Format = seaTex->GetDesc().Format;
     srvDesc.Texture2D.MipLevels = seaTex->GetDesc().MipLevels;
     m_Device->CreateShaderResourceView(m_Textures["sea"]->Resource.Get(), &srvDesc, handle);
+
+    handle.Offset(1, m_CbvSrvUavDescriptorSize);
+    ID3D12Resource* grassTex = m_Textures["grass"]->Resource.Get();
+    srvDesc.Format = grassTex->GetDesc().Format;
+    srvDesc.Texture2D.MipLevels = grassTex->GetDesc().MipLevels;
+    m_Device->CreateShaderResourceView(grassTex, &srvDesc, handle);
 }
 
 
@@ -421,7 +432,7 @@ void MaterialApp::LoadTextureResources()
 {
     std::unique_ptr<Texture> woodCrateTex = std::make_unique<Texture>();
     woodCrateTex->Name = "woodCrateTex";
-    woodCrateTex->FileName = L"resources/wood.dds";
+    woodCrateTex->FileName = L"Textures/WireFence.dds";
     woodCrateTex->AlphaMode = DirectX::DDS_ALPHA_MODE_OPAQUE;
     woodCrateTex->is_cube = false;
     ThrowIfFailed(DirectX::LoadDDSTextureFromFile(m_Device.Get(),
@@ -459,14 +470,39 @@ void MaterialApp::LoadTextureResources()
     
     m_CommandList->ResourceBarrier(1, &pBarrier);
     m_Textures[woodCrateTex->Name] = std::move(woodCrateTex);
+
+    //grass
+    std::unique_ptr<Texture> mountainTex = std::make_unique<Texture>();
+    mountainTex->Name = "grass";
+    mountainTex->FileName = L"Textures/grass.dds";
+    mountainTex->AlphaMode = DirectX::DDS_ALPHA_MODE_OPAQUE;
+    mountainTex->is_cube = false;
+    DirectX::LoadDDSTextureFromFile(m_Device.Get(), mountainTex->FileName.c_str(),
+        mountainTex->Resource.GetAddressOf(), mountainTex->Data,
+        mountainTex->SubResourceData, 0, &mountainTex->AlphaMode, &mountainTex->is_cube);
+    CD3DX12_HEAP_PROPERTIES grassHeap(D3D12_HEAP_TYPE_UPLOAD);
+    UINT64 grassSize = GetRequiredIntermediateSize(mountainTex->Resource.Get(), 0, mountainTex->SubResourceData.size());
+    CD3DX12_RESOURCE_DESC grassDesc = CD3DX12_RESOURCE_DESC::Buffer(grassSize);
+    ThrowIfFailed(m_Device->CreateCommittedResource(&grassHeap,
+        D3D12_HEAP_FLAG_NONE, &grassDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
+        IID_PPV_ARGS(mountainTex->UploadHeap.GetAddressOf())));
+    CD3DX12_RESOURCE_BARRIER grasspB = CD3DX12_RESOURCE_BARRIER::Transition(mountainTex->Resource.Get(),
+        D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
+    m_CommandList->ResourceBarrier(1, &grasspB);
+    UpdateSubresources(m_CommandList.Get(), mountainTex->Resource.Get(), mountainTex->UploadHeap.Get(),
+        0, 0, mountainTex->SubResourceData.size(), mountainTex->SubResourceData.data());
+    grasspB = CD3DX12_RESOURCE_BARRIER::Transition(mountainTex->Resource.Get(),
+        D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
+    m_CommandList->ResourceBarrier(1, &grasspB);
+    m_Textures[mountainTex->Name] = std::move(mountainTex);
 }
 
 void MaterialApp::LoadSeaTextureResource()
 {
     std::unique_ptr<Texture> seaTex = std::make_unique<Texture>();
     seaTex->Name = "sea";
-    seaTex->FileName = L"resources/sea.dds";
-    seaTex->AlphaMode = DirectX::DDS_ALPHA_MODE_OPAQUE;
+    seaTex->FileName = L"Textures/water1.dds";
+    seaTex->AlphaMode = DirectX::DDS_ALPHA_MODE_STRAIGHT;
     seaTex->is_cube = false;
     DirectX::LoadDDSTextureFromFile(m_Device.Get(), seaTex->FileName.c_str(),
         seaTex->Resource.GetAddressOf(), seaTex->Data, seaTex->SubResourceData,
@@ -556,10 +592,19 @@ void MaterialApp::LoadDefaultWhiteTexture()
     m_Textures[defaultWhiteTex->Name] = std::move(defaultWhiteTex);
 }
 
-void MaterialApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems)
+void MaterialApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems,
+    const std::vector<RenderItem*>& transparent)
 {
     for (size_t i = 0; i < ritems.size(); i++)
     {
+        if (ritems[i]->Geo->Name == "box") //box的位置
+        {
+            cmdList->SetPipelineState(m_PSOs["alphaTest"].Get());
+        }
+        else
+        {
+            cmdList->SetPipelineState(m_PSOs["material"].Get());
+        }
         auto ri = ritems[i];
         D3D12_VERTEX_BUFFER_VIEW vertexBufferView = ri->Geo->VertexBufferView();
         D3D12_INDEX_BUFFER_VIEW indexBufferView = ri->Geo->IndexBufferView();
@@ -577,6 +622,29 @@ void MaterialApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std:
         cmdList->SetGraphicsRootConstantBufferView(1, objGPU);
         cmdList->SetGraphicsRootConstantBufferView(2, matGPU);
         cmdList->DrawIndexedInstanced(ri->IndexCount, 1, ri->StartIndexLocation, ri->BaseVertexLocation, 0);
+    }
+    for (int i = 0; i <transparent.size(); ++i)
+    {
+        auto ri = transparent[i];
+        cmdList->SetPipelineState(m_PSOs["transparent"].Get());
+        D3D12_VERTEX_BUFFER_VIEW vbv = ri->Geo->VertexBufferView();
+        D3D12_INDEX_BUFFER_VIEW ibv = ri->Geo->IndexBufferView();
+        cmdList->IASetVertexBuffers(0, 1, &vbv);
+        cmdList->IASetIndexBuffer(&ibv);
+        cmdList->IASetPrimitiveTopology(ri->PrimitiveType);
+
+        CD3DX12_GPU_DESCRIPTOR_HANDLE matHandle(m_SRVDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+        matHandle.Offset(ri->mat->DiffuseSrvHeapIndex, m_CbvSrvUavDescriptorSize);
+        cmdList->SetGraphicsRootDescriptorTable(0, matHandle);
+        //const
+        ID3D12Resource* objR = (ID3D12Resource*)*m_CurrentFrameResource->ObjectCB.get();
+        ID3D12Resource* matR = (ID3D12Resource*)*m_CurrentFrameResource->MaterialCB.get();
+        D3D12_GPU_VIRTUAL_ADDRESS objGPU = objR->GetGPUVirtualAddress() + ri->ObjCBIndex * d3dUtil::CalcConstBufferByteSize(sizeof(ObjectConsts));
+        D3D12_GPU_VIRTUAL_ADDRESS matGPU = matR->GetGPUVirtualAddress() + ri->mat->MatCBIndex * d3dUtil::CalcConstBufferByteSize(sizeof(MaterialConstants));
+        cmdList->SetGraphicsRootConstantBufferView(1, objGPU);
+        cmdList->SetGraphicsRootConstantBufferView(2, matGPU);
+        cmdList->DrawIndexedInstanced(ri->IndexCount, 1, ri->StartIndexLocation, ri->BaseVertexLocation,
+            0);
     }
 }
 
@@ -601,6 +669,34 @@ void MaterialApp::CreatePSO()
     ComPtr<ID3D12PipelineState> pso;
     ThrowIfFailed(m_Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(pso.GetAddressOf())));
     m_PSOs["material"] = std::move(pso);
+    
+    psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+    ComPtr<ID3D12PipelineState> alphaTestPSO;
+    ThrowIfFailed(m_Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(alphaTestPSO.GetAddressOf())));
+    m_PSOs["alphaTest"] = std::move(alphaTestPSO);
+
+    D3D12_BLEND_DESC blendStateDesc{};
+    blendStateDesc.AlphaToCoverageEnable = false;
+    blendStateDesc.IndependentBlendEnable = false;
+    D3D12_RENDER_TARGET_BLEND_DESC rendeTargetBlendDesc{};
+    rendeTargetBlendDesc.BlendEnable = true;
+    rendeTargetBlendDesc.LogicOpEnable = false;
+    rendeTargetBlendDesc.SrcBlend = D3D12_BLEND_SRC_ALPHA;
+    rendeTargetBlendDesc.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+    rendeTargetBlendDesc.BlendOp = D3D12_BLEND_OP_ADD;
+    rendeTargetBlendDesc.SrcBlendAlpha = D3D12_BLEND_ONE;
+    rendeTargetBlendDesc.DestBlendAlpha = D3D12_BLEND_ZERO;
+    rendeTargetBlendDesc.BlendOpAlpha = D3D12_BLEND_OP_ADD;
+    rendeTargetBlendDesc.LogicOp = D3D12_LOGIC_OP_NOOP;
+    rendeTargetBlendDesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+    blendStateDesc.RenderTarget[0] = rendeTargetBlendDesc;
+
+    psoDesc.BlendState = blendStateDesc;
+    psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
+    psoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+    ComPtr<ID3D12PipelineState> transparentPSO;
+    ThrowIfFailed(m_Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(transparentPSO.GetAddressOf())));
+    m_PSOs["transparent"] = std::move(transparentPSO);
 }
 
 void MaterialApp::Update(const GameTimer& gt)
@@ -696,6 +792,10 @@ void MaterialApp::UpdateFramresouce(const GameTimer& gt)
     DirectX::XMVECTOR lightDir = DirectX::XMVectorSet(-sunX, -sunY, -sunZ, 0.0f);
     DirectX::XMStoreFloat3(&passCB.gLights[0].Direction, lightDir);
     passCB.gLights[0].Strength = {1.0f, 1.0f, 0.9f};
+    passCB.FogColor = DirectX::XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+    passCB.FogRange = 100.0f;
+    passCB.FogStart = 40.0f;
+    passCB.Padding = DirectX::XMFLOAT2(0.0f, 0.0f);
     m_CurrentFrameResource->PassCB->CopyData(0, passCB);
 }
 
@@ -866,7 +966,6 @@ void MaterialApp::Draw(const GameTimer& gt)
     m_CommandList->OMSetRenderTargets(1, &FrameHandle, true, &DepthHandle);
     m_CommandList->RSSetViewports(1, &m_ViewPort);
     m_CommandList->RSSetScissorRects(1, &m_ScissorRect);
-    
     m_CommandList->ClearRenderTargetView(FrameHandle, DirectX::Colors::LightSteelBlue, 0, nullptr);
     m_CommandList->ClearDepthStencilView(DepthHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 
@@ -877,12 +976,17 @@ void MaterialApp::Draw(const GameTimer& gt)
     D3D12_GPU_VIRTUAL_ADDRESS pFrameResource = FrameConstResource->GetGPUVirtualAddress();
     m_CommandList->SetGraphicsRootConstantBufferView(3, pFrameResource);
     m_Opaques.clear();
+    m_Transparent.clear();
     for (int i = 0; i < m_RenderItems.size(); ++i)
     {
-        if (i == 0) continue;
+        if (m_RenderItems[i]->Geo->Name == "sea")
+        {
+            m_Transparent.push_back(m_RenderItems[i].get());
+            continue;
+        }
         m_Opaques.push_back(m_RenderItems[i].get());
     }
-    DrawRenderItems(m_CommandList.Get(), m_Opaques);
+    DrawRenderItems(m_CommandList.Get(), m_Opaques, m_Transparent);
 
     pBarrier = CD3DX12_RESOURCE_BARRIER::Transition(CurrentFrame, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
     m_CommandList->ResourceBarrier(1, &pBarrier);

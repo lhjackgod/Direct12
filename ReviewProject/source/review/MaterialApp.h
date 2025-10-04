@@ -59,7 +59,8 @@ private:
     void OnMouseUp(WPARAM btnState, int x, int y) override;
 
     void Draw(const GameTimer& gt) override;
-    void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*> &ritems);
+    void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*> &ritems,
+        const std::vector<RenderItem*>& transparent);
     std::array<const CD3DX12_STATIC_SAMPLER_DESC, 6> GetStaticSamplers();
     
     std::vector<D3D12_INPUT_ELEMENT_DESC> m_InputLayout;
@@ -70,6 +71,7 @@ private:
     std::unique_ptr<UploadBuffer<Vertex>> m_SeaUploaderBuffer;
     std::vector<std::unique_ptr<RenderItem>> m_RenderItems;
     std::vector<RenderItem*> m_Opaques;
+    std::vector<RenderItem*> m_Transparent;
     std::unordered_map<std::string, std::unique_ptr<d3dUtil::Material>> m_Materials;
     std::vector<std::unique_ptr<FrameResource>> m_FrameResources;
     FrameResource* m_CurrentFrameResource;

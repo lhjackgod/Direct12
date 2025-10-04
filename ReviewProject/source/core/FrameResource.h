@@ -19,7 +19,10 @@ struct PassConstant
     float TotalTime;
     float DeltaTime;
     DirectX::XMFLOAT4 gAmbientLight;
-
+    DirectX::XMFLOAT4 FogColor;
+    float FogStart;
+    float FogRange;
+    DirectX::XMFLOAT2 Padding;
     d3dUtil::Light gLights[MaxLights];
 };
 struct ObjectConsts

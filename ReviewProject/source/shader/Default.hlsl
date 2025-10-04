@@ -45,6 +45,12 @@ cbuffer cbPass : register(b2)
     float gDeltaTime;
     float4 gAmbientLight;
 
+    //允许应用程序在每一帧都能改变雾效参数
+    //例如，我们可能只在一天中的特定时间才使用雾效
+    float4 gFogColor;
+    float gFogStart;
+    float gFogRange;
+    float2 cbPerPassPad2;
     Light gLights[MaxLights];
 };
 
