@@ -18,6 +18,7 @@ bool MaterialApp::Initialize()
     CreateGeometries();
     LoadDefaultWhiteTexture();
     LoadTextureResources();
+    LoadSeaTextureResource();
     CreateSRVDescriptorHeap();
     CreateSRVView();
     CreateMaterial();
@@ -134,6 +135,20 @@ void MaterialApp::CreateGeometries()
 
     // sea Geometry
     m_SeaUploaderBuffer = std::make_unique<UploadBuffer<Vertex>>(m_Device.Get(), land.Vertices.size(), false);
+    for (UINT i = 0; i < land.Vertices.size(); ++i)
+    {
+        Vertex v;
+        v.Pos.x = land.Vertices[i].Position.x;
+        v.Pos.y = land.Vertices[i].Position.y;
+        v.Pos.z = land.Vertices[i].Position.z;
+        v.Normal.x = 0.0f;
+        v.Normal.y = 1.0f;
+        v.Normal.z = 0.0f;
+        v.TexC.x = land.Vertices[i].TexC.x;
+        v.TexC.y = land.Vertices[i].TexC.y;
+
+        m_SeaUploaderBuffer->CopyData(i, v);
+    }
     std::unique_ptr<d3dUtil::MeshGeometry> seaGeo = std::make_unique<d3dUtil::MeshGeometry>();
     vbByteSize = sizeof(Vertex) * land.Vertices.size();
     ibByteSize = sizeof(uint16_t) * land.GetIndices16().size();
@@ -143,8 +158,11 @@ void MaterialApp::CreateGeometries()
     CopyMemory(seaGeo->IndexBufferCPU->GetBufferPointer(), land.GetIndices16().data(), ibByteSize);
     seaGeo->Name = "sea";
     seaGeo->VertexBufferGPU = (ID3D12Resource*)*m_SeaUploaderBuffer;
-    seaGeo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(m_Device.Get(), m_CommandList.Get(), land.GetIndices16().data(),
+    seaGeo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(m_Device.Get(), m_CommandList.Get(), seaGeo->IndexBufferCPU.Get(),
         ibByteSize, seaGeo->IndexBufferUploader);
+    seaGeo->VertexByteStride = sizeof(Vertex);
+    seaGeo->VertexByteSize = sizeof(Vertex) * landVertex.size();
+    seaGeo->IndexBufferByteSize = sizeof(uint16_t) * land.GetIndices16().size();
     d3dUtil::SubmeshGeometry seaSub;
     seaSub.IndexCount = land.GetIndices16().size();
     seaSub.StartIndexLocation = 0;
@@ -158,7 +176,7 @@ void MaterialApp::CreateMaterial()
     std::unique_ptr<d3dUtil::Material> grass = std::make_unique<d3dUtil::Material>();
     grass->Name = "land";
     grass->MatCBIndex = 0;
-    grass->DiffuseSrvHeapIndex = 0;
+    grass->DiffuseSrvHeapIndex = 1;
     grass->DiffuseAlbedo = DirectX::XMFLOAT4(0.2f, 0.6f, 0.2f, 1.0f);
     grass->FresnelR0 = DirectX::XMFLOAT3(0.01f, 0.01f, 0.01f);
     grass->Roughness = 0.125f;
@@ -167,7 +185,7 @@ void MaterialApp::CreateMaterial()
     auto water = std::make_unique<d3dUtil::Material>();
     water->Name = "sea";
     water->MatCBIndex = 1;
-    water->DiffuseSrvHeapIndex = 0;
+    water->DiffuseSrvHeapIndex = 2;
     water->DiffuseAlbedo = DirectX::XMFLOAT4(0.0f, 0.2f, 0.6f, 1.0f);
     water->FresnelR0 = DirectX::XMFLOAT3(0.1f, 0.1f, 0.1f);
     water->Roughness = 0.0f;
@@ -217,13 +235,18 @@ void MaterialApp::CreateRenderItems()
 
     std::unique_ptr<RenderItem> boxRitem = std::make_unique<RenderItem>();
     boxRitem->ObjCBIndex = 2;
+    DirectX::XMMATRIX worldMatrix = DirectX::XMMatrixIdentity();
+    worldMatrix *= DirectX::XMMatrixTranslation(0.0f, 8.0f, 0.0f);
+    DirectX::XMStoreFloat4x4(&boxRitem->World, worldMatrix);
     boxRitem->Geo = m_Geometries["box"].get();
     boxRitem->mat = m_Materials["box"].get();
     boxRitem->IndexCount = boxRitem->Geo->DrawArgs["box"].IndexCount;
     boxRitem->StartIndexLocation = boxRitem->Geo->DrawArgs["box"].StartIndexLocation;
     boxRitem->BaseVertexLocation = boxRitem->Geo->DrawArgs["box"].BaseVertexLocation;
     boxRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-    
+    DirectX::XMMATRIX boxTexTransform = DirectX::XMLoadFloat4x4(&boxRitem->TexTransform);
+    boxTexTransform = DirectX::XMMatrixMultiply(boxTexTransform, DirectX::XMMatrixScaling(5.0f, 5.0f, 1.0f));
+    DirectX::XMStoreFloat4x4(&boxRitem->TexTransform, DirectX::XMMatrixTranspose(boxTexTransform));
     m_RenderItems.push_back(std::move(landRitem));
     m_RenderItems.push_back(std::move(seaRitem));
     m_RenderItems.push_back(std::move(boxRitem));
@@ -356,7 +379,7 @@ void MaterialApp::CreateSRVDescriptorHeap()
 {
     D3D12_DESCRIPTOR_HEAP_DESC srvdesc{};
     srvdesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-    srvdesc.NumDescriptors = 2;
+    srvdesc.NumDescriptors = 3;
     srvdesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
     srvdesc.NodeMask = 0;
     ThrowIfFailed(m_Device->CreateDescriptorHeap(&srvdesc, IID_PPV_ARGS(m_SRVDescriptorHeap.GetAddressOf())));
@@ -385,6 +408,12 @@ void MaterialApp::CreateSRVView()
     handle.Offset(1, m_CbvSrvUavDescriptorSize);
     m_Device->CreateShaderResourceView(m_Textures["default"]->Resource.Get(),
         &srvDesc, handle);
+
+    handle.Offset(1, m_CbvSrvUavDescriptorSize);
+    ID3D12Resource* seaTex = m_Textures["sea"]->Resource.Get();
+    srvDesc.Format = seaTex->GetDesc().Format;
+    srvDesc.Texture2D.MipLevels = seaTex->GetDesc().MipLevels;
+    m_Device->CreateShaderResourceView(m_Textures["sea"]->Resource.Get(), &srvDesc, handle);
 }
 
 
@@ -430,6 +459,32 @@ void MaterialApp::LoadTextureResources()
     
     m_CommandList->ResourceBarrier(1, &pBarrier);
     m_Textures[woodCrateTex->Name] = std::move(woodCrateTex);
+}
+
+void MaterialApp::LoadSeaTextureResource()
+{
+    std::unique_ptr<Texture> seaTex = std::make_unique<Texture>();
+    seaTex->Name = "sea";
+    seaTex->FileName = L"resources/sea.dds";
+    seaTex->AlphaMode = DirectX::DDS_ALPHA_MODE_OPAQUE;
+    seaTex->is_cube = false;
+    DirectX::LoadDDSTextureFromFile(m_Device.Get(), seaTex->FileName.c_str(),
+        seaTex->Resource.GetAddressOf(), seaTex->Data, seaTex->SubResourceData,
+        0, &seaTex->AlphaMode, &seaTex->is_cube);
+    CD3DX12_RESOURCE_BARRIER pB = CD3DX12_RESOURCE_BARRIER::Transition(seaTex->Resource.Get(), D3D12_RESOURCE_STATE_COMMON,
+        D3D12_RESOURCE_STATE_COPY_DEST);
+    m_CommandList->ResourceBarrier(1, &pB);
+    CD3DX12_HEAP_PROPERTIES pP = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+    UINT64 dataSize = GetRequiredIntermediateSize(seaTex->Resource.Get(), 0, seaTex->SubResourceData.size());
+    CD3DX12_RESOURCE_DESC pD = CD3DX12_RESOURCE_DESC::Buffer(dataSize);
+    ThrowIfFailed(m_Device->CreateCommittedResource(&pP, D3D12_HEAP_FLAG_NONE, &pD, D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr, IID_PPV_ARGS(seaTex->UploadHeap.GetAddressOf())));
+    UpdateSubresources(m_CommandList.Get(), seaTex->Resource.Get(), seaTex->UploadHeap.Get(), 0,
+        0, seaTex->SubResourceData.size(), seaTex->SubResourceData.data());
+    pB = CD3DX12_RESOURCE_BARRIER::Transition(seaTex->Resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST,
+        D3D12_RESOURCE_STATE_COMMON);
+    m_CommandList->ResourceBarrier(1, &pB);
+    m_Textures[seaTex->Name] = std::move(seaTex);
 }
 
 void MaterialApp::LoadDefaultWhiteTexture()
@@ -573,7 +628,7 @@ void MaterialApp::Update(const GameTimer& gt)
     UpdateFramresouce(gt);
     UpdateObj(gt);
     UpdateMaterial(gt);
-    UpdateSea(gt);
+    //UpdateSea(gt);
 }
 
 void MaterialApp::UpdateObj(const GameTimer& gt)
@@ -584,14 +639,17 @@ void MaterialApp::UpdateObj(const GameTimer& gt)
         {
             r->NumFrameDirty--;
             ObjectConsts objConstData;
-            objConstData.World = r->World;
+            
             DirectX::XMMATRIX world = DirectX::XMLoadFloat4x4(&r->World);
+            DirectX::XMMATRIX worldT = DirectX::XMMatrixTranspose(world);
+            DirectX::XMFLOAT4X4 p;
+            DirectX::XMStoreFloat4x4(&p, worldT);
             DirectX::XMMATRIX invtworld = MathHelper::InverseTanspose(world);
             DirectX::XMFLOAT4X4 w;
-            DirectX::XMStoreFloat4x4(&w, invtworld);
+            DirectX::XMStoreFloat4x4(&w, DirectX::XMMatrixTranspose(invtworld));
             objConstData.TInvWorld = w;
-            
-            DirectX::XMStoreFloat4x4(&w, invtworld);
+            objConstData.World = p;
+            objConstData.TexTransform = r->TexTransform;
             m_CurrentFrameResource->ObjectCB->CopyData(r->ObjCBIndex, objConstData);
         }
     }
@@ -656,6 +714,24 @@ void MaterialApp::UpdateMaterial(const GameTimer& gt)
         }
     }
 }
+
+void MaterialApp::AnimateMaterials(const GameTimer& gt)
+{
+    auto waterMat = m_Materials["sea"].get();
+    float& tu = waterMat->MatTransform(3, 0);
+    float& tv = waterMat->MatTransform(3, 1);
+
+    tu += 0.1f * gt.DeltaTime();
+    tv += 0.02f * gt.DeltaTime();
+
+    if (tu >= 1.0f) tu -= 1.0f;
+    if (tv >= 1.0f) tv -= 1.0f;
+
+    waterMat->MatTransform(3, 0) = tu;
+    waterMat->MatTransform(3, 1) = tv;
+    waterMat->NumFrameDirty = gNumFrameResources;
+}
+
 
 DirectX::XMFLOAT3 MaterialApp::calculateNormal(float amplitude, float waveSpeed, float speed, float time, DirectX::XMFLOAT2 direction, DirectX::XMFLOAT2 pos_xy)
 {
@@ -800,6 +876,7 @@ void MaterialApp::Draw(const GameTimer& gt)
     m_Opaques.clear();
     for (int i = 0; i < m_RenderItems.size(); ++i)
     {
+        if (!i) continue;
         m_Opaques.push_back(m_RenderItems[i].get());
     }
     DrawRenderItems(m_CommandList.Get(), m_Opaques);

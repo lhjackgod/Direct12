@@ -28,6 +28,7 @@ private:
     void CreateShaderAndInputLayout();
     void createRootSignature();
     void LoadTextureResources();
+    void LoadSeaTextureResource();
     void LoadDefaultWhiteTexture();
     void CreateSRVDescriptorHeap();
     void CreateSRVView();
@@ -40,6 +41,7 @@ private:
     void UpdateObj(const GameTimer& gt);
     void UpdateFramresouce(const GameTimer& gt);
     void UpdateSea(const GameTimer& gt);
+    void AnimateMaterials(const GameTimer& gt);
     float CalculateWaveHeight(float amplitude,
         float waveSpeed,
         float speed,

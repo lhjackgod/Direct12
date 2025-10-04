@@ -26,7 +26,7 @@ struct ObjectConsts
 {
     DirectX::XMFLOAT4X4 World;
     DirectX::XMFLOAT4X4 TInvWorld;
-    DirectX::XMFLOAT4X4 TexTransform;
+    DirectX::XMFLOAT4X4 TexTransform = MathHelper::Identity4x4();
 };
 struct Vertex
 {
@@ -62,7 +62,7 @@ struct RenderItem
     //描述物体局部空间相对于世界空间的世界矩阵
     //它定义了物体位于世界空间中的位置、朝向以及大小
     DirectX::XMFLOAT4X4 World = MathHelper::Identity4x4();
-
+    DirectX::XMFLOAT4X4 TexTransform = MathHelper::Identity4x4();
     //用已更行标记（dirty flag）来表示物体的相关数据已发生改变，这意味着我们此时需要更新常量缓冲区。
     //由于每个FrameResource中都有一个物体常量缓冲区，所以我们必须对每个FrameResource都进行更新
     //即，当我们修改物体数据的时候，应当按NumFramesDirty=gNumFrameResource进行设置

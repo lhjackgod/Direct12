@@ -289,12 +289,12 @@ GeometryGenerator::MeshData GeometryGenerator::CreateBox(float width, float heig
     uint32_t indices[36] =
 {
         // Front face (Normal: 0,0,-1)
-        0, 2, 1,    // Triangle 1: v0-v2-v1
-        0, 3, 2,    // Triangle 2: v0-v3-v2
+        0, 1, 2,    // Triangle 1: v0-v2-v1
+        0, 2, 3,    // Triangle 2: v0-v3-v2
 
         // Back face (Normal: 0,0,1)
-        4, 6, 5,    // Triangle 1: v4-v6-v5
-        4, 7, 6,    // Triangle 2: v4-v7-v6
+        4, 5, 6,    // Triangle 1: v4-v6-v5
+        4, 6, 7,    // Triangle 2: v4-v7-v6
 
         // Left face (Normal: -1,0,0)
         8, 10, 9,   // Triangle 1: v8-v10-v9

@@ -7,29 +7,33 @@ D:\Direct12\ReviewProject\ReviewProject\source\D3DUtil.h(1,1): warning C4819: �
 D:\Direct12\ReviewProject\ReviewProject\source\core\D3DApp.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
 D:\Direct12\ReviewProject\ReviewProject\source\core\GameTimer.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
 D:\Direct12\ReviewProject\ReviewProject\source\core\FrameResource.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
-D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(77,21): warning C4267: “初始化”: 从“size_t”转换到“UINT”，可能丢失数据
 D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(78,21): warning C4267: “初始化”: 从“size_t”转换到“UINT”，可能丢失数据
-D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(93,50): warning C4267: “=”: 从“size_t”转换到“UINT”，可能丢失数据
-D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(112,33): warning C4267: “=”: 从“size_t”转换到“UINT”，可能丢失数据
-D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(113,35): warning C4267: “=”: 从“size_t”转换到“UINT”，可能丢失数据
-D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(129,48): warning C4267: “=”: 从“size_t”转换到“UINT”，可能丢失数据
-D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(138,33): warning C4267: “=”: 从“size_t”转换到“UINT”，可能丢失数据
-D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(139,35): warning C4267: “=”: 从“size_t”转换到“UINT”，可能丢失数据
-D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(149,49): warning C4267: “=”: 从“size_t”转换到“UINT”，可能丢失数据
-D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(190,24): warning C4018: “<”: 有符号/无符号不匹配
-D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(414,43): warning C4267: “参数”: 从“size_t”转换到“UINT”，可能丢失数据
-D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(413,19): warning C4244: “初始化”: 从“UINT64”转换到“UINT”，可能丢失数据
-D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(425,49): warning C4267: “参数”: 从“size_t”转换到“UINT”，可能丢失数据
-D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(478,122): warning C4267: “参数”: 从“size_t”转换到“UINT”，可能丢失数据
-D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(478,19): warning C4244: “初始化”: 从“UINT64”转换到“UINT”，可能丢失数据
-D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(496,46): warning C4267: “参数”: 从“size_t”转换到“UINT”，可能丢失数据
-D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(655,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
-D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(815,37): warning C4244: “=”: 从“UINT64”转换到“UINT”，可能丢失数据
+D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(79,21): warning C4267: “初始化”: 从“size_t”转换到“UINT”，可能丢失数据
+D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(94,50): warning C4267: “=”: 从“size_t”转换到“UINT”，可能丢失数据
+D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(113,33): warning C4267: “=”: 从“size_t”转换到“UINT”，可能丢失数据
+D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(114,35): warning C4267: “=”: 从“size_t”转换到“UINT”，可能丢失数据
+D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(130,48): warning C4267: “=”: 从“size_t”转换到“UINT”，可能丢失数据
+D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(153,33): warning C4267: “=”: 从“size_t”转换到“UINT”，可能丢失数据
+D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(154,35): warning C4267: “=”: 从“size_t”转换到“UINT”，可能丢失数据
+D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(164,45): warning C4267: “=”: 从“size_t”转换到“UINT”，可能丢失数据
+D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(165,52): warning C4267: “=”: 从“size_t”转换到“UINT”，可能丢失数据
+D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(167,49): warning C4267: “=”: 从“size_t”转换到“UINT”，可能丢失数据
+D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(208,24): warning C4018: “<”: 有符号/无符号不匹配
+D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(443,43): warning C4267: “参数”: 从“size_t”转换到“UINT”，可能丢失数据
+D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(442,19): warning C4244: “初始化”: 从“UINT64”转换到“UINT”，可能丢失数据
+D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(454,49): warning C4267: “参数”: 从“size_t”转换到“UINT”，可能丢失数据
+D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(478,106): warning C4267: “参数”: 从“size_t”转换到“UINT”，可能丢失数据
+D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(483,40): warning C4267: “参数”: 从“size_t”转换到“UINT”，可能丢失数据
+D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(533,122): warning C4267: “参数”: 从“size_t”转换到“UINT”，可能丢失数据
+D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(533,19): warning C4244: “初始化”: 从“UINT64”转换到“UINT”，可能丢失数据
+D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(551,46): warning C4267: “参数”: 从“size_t”转换到“UINT”，可能丢失数据
+D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(646,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(892,37): warning C4244: “=”: 从“UINT64”转换到“UINT”，可能丢失数据
 C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.36.32532\include\memory(3465,56): warning C4267: “参数”: 从“size_t”转换到“UINT”，可能丢失数据
-D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(136,32): message : 查看对正在编译的函数 模板 实例化“std::unique_ptr<UploadBuffer<Vertex>,std::default_delete<UploadBuffer<Vertex>>> std::make_unique<UploadBuffer<Vertex>,T*,unsigned __int64,bool,0>(T *&&,unsigned __int64 &&,bool &&)”的引用
+D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(137,32): message : 查看对正在编译的函数 模板 实例化“std::unique_ptr<UploadBuffer<Vertex>,std::default_delete<UploadBuffer<Vertex>>> std::make_unique<UploadBuffer<Vertex>,T*,unsigned __int64,bool,0>(T *&&,unsigned __int64 &&,bool &&)”的引用
           with
           [
               T=ID3D12Device
           ]
-D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(34): warning C4715: “MaterialApp::Initialize”: 不是所有的控件路径都返回值
+D:\Direct12\ReviewProject\ReviewProject\source\review\MaterialApp.cpp(35): warning C4715: “MaterialApp::Initialize”: 不是所有的控件路径都返回值
   ReviewProject.vcxproj -> D:\Direct12\ReviewProject\x64\Debug\ReviewProject.exe
