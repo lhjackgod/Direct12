@@ -23,7 +23,7 @@ struct PassConstant
     float FogStart;
     float FogRange;
     DirectX::XMFLOAT2 Padding;
-    d3dUtil::Light gLights[MaxLights];
+    d3dUtil::Light Lights[MaxLights];
 };
 struct ObjectConsts
 {
@@ -36,6 +36,13 @@ struct Vertex
     DirectX::XMFLOAT3 Pos;
     DirectX::XMFLOAT3 Normal;
     DirectX::XMFLOAT2 TexC;
+    Vertex(float posx, float posy, float posz,
+        float normalx, float normaly, float normalz,
+        float texcx, float texcy)
+            : Pos(posx, posy, posz),
+              Normal(normalx, normaly, normalz),
+              TexC(texcx, texcy){}
+    Vertex() = default;
 };
 
 struct Texture

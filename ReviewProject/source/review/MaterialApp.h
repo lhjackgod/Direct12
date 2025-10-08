@@ -4,6 +4,16 @@
 #include "D3DApp.h"
 #include "FrameResource.h"
 
+enum class RenderLayer
+{
+    Opaque = 0,
+    Mirrors,
+    Reflected,
+    Transparent,
+    Shadow,
+    Count
+};
+
 class MaterialApp : public D3DApp
 {
 public:
@@ -21,15 +31,14 @@ private:
     };
     float GetHillHeight(float x, float z) const;
     DirectX::XMFLOAT3 GetHillsNormal(float x, float z) const;
-    void CreateGeometries();
+    void LoadShull();
+    void LoadRoom();
     void CreateFrameResources();
-    void CreateRenderItems();
+    void CreateShullBoxRenderItems();
     void CreateSamplerDescriptor();
     void CreateShaderAndInputLayout();
     void createRootSignature();
     void LoadTextureResources();
-    void LoadSeaTextureResource();
-    void LoadDefaultWhiteTexture();
     void CreateSRVDescriptorHeap();
     void CreateSRVView();
     void CreateMaterial();
@@ -40,27 +49,13 @@ private:
     void UpdateMaterial(const GameTimer& gt);
     void UpdateObj(const GameTimer& gt);
     void UpdateFramresouce(const GameTimer& gt);
-    void UpdateSea(const GameTimer& gt);
-    void AnimateMaterials(const GameTimer& gt);
-    float CalculateWaveHeight(float amplitude,
-        float waveSpeed,
-        float speed,
-        float time,
-        DirectX::XMFLOAT2 direction,
-        DirectX::XMFLOAT2 pos_xy);
-    DirectX::XMFLOAT3 calculateNormal(float amplitude,
-        float waveSpeed,
-        float speed,
-        float time,
-        DirectX::XMFLOAT2 direction,
-        DirectX::XMFLOAT2 pos_xy);
+    void UpdateReflectFrameResources(const GameTimer& gt);
     void OnMouseDown(WPARAM btnState, int x, int y) override;
     void OnMouseMove(WPARAM btnState, int x, int y) override;
     void OnMouseUp(WPARAM btnState, int x, int y) override;
 
     void Draw(const GameTimer& gt) override;
-    void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*> &ritems,
-        const std::vector<RenderItem*>& transparent);
+    void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*> &ritems);
     std::array<const CD3DX12_STATIC_SAMPLER_DESC, 6> GetStaticSamplers();
     
     std::vector<D3D12_INPUT_ELEMENT_DESC> m_InputLayout;
@@ -70,8 +65,11 @@ private:
     std::unordered_map<std::string, std::unique_ptr<d3dUtil::MeshGeometry>> m_Geometries;
     std::unique_ptr<UploadBuffer<Vertex>> m_SeaUploaderBuffer;
     std::vector<std::unique_ptr<RenderItem>> m_RenderItems;
+    std::vector<RenderItem*> m_PassRenderItems[(int)RenderLayer::Count];
+    PassConstant m_MainPassCB;
+    PassConstant m_ReflectedPassCB;
+
     std::vector<RenderItem*> m_Opaques;
-    std::vector<RenderItem*> m_Transparent;
     std::unordered_map<std::string, std::unique_ptr<d3dUtil::Material>> m_Materials;
     std::vector<std::unique_ptr<FrameResource>> m_FrameResources;
     FrameResource* m_CurrentFrameResource;

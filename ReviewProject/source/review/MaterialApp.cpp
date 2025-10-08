@@ -5,6 +5,7 @@
 #include "core/GeometryGenerator.h"
 #include "core/DDSTexttureLoader.h"
 #include "DirectXColors.h"
+#include <fstream>
 MaterialApp::MaterialApp(HINSTANCE hInstace)
     :D3DApp(hInstace)
 {
@@ -15,14 +16,13 @@ bool MaterialApp::Initialize()
     if (!D3DApp::Initialize())
         return false;
     m_CommandList->Reset(m_CommandAllocator.Get(), nullptr);
-    CreateGeometries();
-    LoadDefaultWhiteTexture();
+    LoadShull();
+    LoadRoom();
     LoadTextureResources();
-    LoadSeaTextureResource();
     CreateSRVDescriptorHeap();
     CreateSRVView();
     CreateMaterial();
-    CreateRenderItems();
+    CreateShullBoxRenderItems();
     CreateFrameResources();
     CreateShaderAndInputLayout();
     createRootSignature();
@@ -56,200 +56,327 @@ DirectX::XMFLOAT3 MaterialApp::GetHillsNormal(float x, float z) const
     return n;
 }
 
-void MaterialApp::CreateGeometries()
+void MaterialApp::LoadShull()
 {
-    //first get data
-    GeometryGenerator geoGen;
-    GeometryGenerator::MeshData land = geoGen.CreateGrid(160.0f, 160.0f, 50, 50);
-    GeometryGenerator::MeshData box = geoGen.CreateBox(10, 10, 10);
-    // land and box
-    std::vector<Vertex> landVertex(land.Vertices.size());
-    for (UINT i = 0; i < land.Vertices.size(); ++i)
+    std::ifstream fin("modules/skull.txt");
+    if (!fin.is_open())
     {
-        Vertex v;
-        v.Pos = land.Vertices[i].Position;
-        v.Pos.y = GetHillHeight(v.Pos.x, v.Pos.z);
-        v.Normal = land.Vertices[i].Normal;
-        v.TexC = land.Vertices[i].TexC;
-        landVertex[i] = std::move(v);
+        MessageBox(mhMainWnd, L"Models/skull.txt not found.", L"Not Found", MB_OK);
     }
-    //land geometry
-    std::unique_ptr<d3dUtil::MeshGeometry> landGeo = std::make_unique<d3dUtil::MeshGeometry>();
-    UINT vbByteSize = sizeof(Vertex) * landVertex.size();
-    UINT ibByteSize = sizeof(uint16_t) * land.GetIndices16().size();
-    ThrowIfFailed(D3DCreateBlob(vbByteSize, landGeo->VertexBufferCPU.GetAddressOf()));
-    ThrowIfFailed(D3DCreateBlob(ibByteSize, landGeo->IndexBufferCPU.GetAddressOf()));
-    CopyMemory(landGeo->VertexBufferCPU->GetBufferPointer(), landVertex.data(), vbByteSize);
-    CopyMemory(landGeo->IndexBufferCPU->GetBufferPointer(), land.GetIndices16().data(), ibByteSize);
-    landGeo->Name = "land";
-    landGeo->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(m_Device.Get(), m_CommandList.Get(), landGeo->VertexBufferCPU->GetBufferPointer(),
-        vbByteSize, landGeo->VertexBufferUploader);
-    landGeo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(m_Device.Get(), m_CommandList.Get(), landGeo->IndexBufferCPU->GetBufferPointer(),
-        ibByteSize, landGeo->IndexBufferUploader);
-    landGeo->VertexByteStride = sizeof(Vertex);
-    landGeo->VertexByteSize = vbByteSize;
-    landGeo->IndexBufferByteSize = ibByteSize;
-    landGeo->IndexFormat = DXGI_FORMAT_R16_UINT;
-    d3dUtil::SubmeshGeometry landSub;
-    landSub.IndexCount = land.GetIndices16().size();
-    landSub.StartIndexLocation = 0;
-    landSub.BaseVertexLocation = 0;
-    landGeo->DrawArgs["land"] = std::move(landSub);
-
-    m_Geometries[landGeo->Name] = std::move(landGeo);
+    std::string ignore;
+    UINT vcount = 0;
+    UINT tcount = 0;
+    fin >> ignore >> vcount;
+    fin >> ignore >> tcount;
+    fin >> ignore >> ignore >> ignore >> ignore;
+    std::vector<Vertex> vertices(vcount);
+    for (UINT i = 0; i < vcount; ++i)
+    {
+        fin >> vertices[i].Pos.x >> vertices[i].Pos.y >> vertices[i].Pos.z;
+        fin >> vertices[i].Normal.x >> vertices[i].Normal.y >> vertices[i].Normal.z;
+        vertices[i].TexC = {0.0f, 0.0f};
+    }
+    fin >> ignore >> ignore >> ignore;
+    std::vector<uint32_t> indices(tcount * 3);
+    for (UINT i = 0; i < tcount; ++i)
+    {
+        fin >> indices[i * 3 + 0] >> indices[i * 3 + 1] >> indices[i * 3 + 2];
+    }
+    fin >> ignore;
+    fin.close();
+    std::unique_ptr<d3dUtil::MeshGeometry> ShullGeom = std::make_unique<d3dUtil::MeshGeometry>();
+    ShullGeom->Name = "Shull";
+    UINT vbBytes = sizeof(Vertex) * vertices.size();
+    UINT ibBytes = sizeof(uint32_t) * indices.size();
     
-    std::vector<Vertex> boxVertex(box.Vertices.size());
-    for (UINT i = 0; i < box.Vertices.size(); ++i)
+    ThrowIfFailed(D3DCreateBlob(vbBytes, ShullGeom->VertexBufferCPU.GetAddressOf()));
+    ThrowIfFailed(D3DCreateBlob(ibBytes, ShullGeom->IndexBufferCPU.GetAddressOf()));
+    CopyMemory(ShullGeom->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbBytes);
+    CopyMemory(ShullGeom->IndexBufferCPU->GetBufferPointer(), indices.data(), ibBytes);
+    ShullGeom->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(m_Device.Get(), m_CommandList.Get(),
+    ShullGeom->VertexBufferCPU->GetBufferPointer(), vbBytes, ShullGeom->VertexBufferUploader);
+    ShullGeom->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(m_Device.Get(), m_CommandList.Get(),
+        ShullGeom->IndexBufferCPU->GetBufferPointer(), ibBytes, ShullGeom->IndexBufferUploader);
+    ShullGeom->VertexByteStride = sizeof(Vertex);
+    ShullGeom->VertexByteSize = vbBytes;
+    ShullGeom->IndexBufferByteSize = ibBytes;
+    ShullGeom->IndexFormat = DXGI_FORMAT_R32_UINT;
+
+    d3dUtil::SubmeshGeometry shullSub;
+    shullSub.IndexCount = indices.size();
+    shullSub.BaseVertexLocation = 0;
+    shullSub.StartIndexLocation = 0;
+    ShullGeom->DrawArgs["shull"] = std::move(shullSub);
+    m_Geometries[ShullGeom->Name] = std::move(ShullGeom);
+}
+
+void MaterialApp::LoadRoom()
+{
+    // Create and specify geometry.  For this sample we draw a floor
+    // and a wall with a mirror on it.  We put the floor, wall, and
+    // mirror geometry in one vertex buffer.
+    //
+    //   |--------------|
+    //   |              |
+    //   |----|----|----|
+    //   |Wall|Mirr|Wall|
+    //   |    | or |    |
+    //   /--------------/
+    //  /   Floor      /
+    // /--------------/
+    std::array<Vertex, 20> vertices =
     {
-        Vertex v;
-        v.Pos = box.Vertices[i].Position;
-        v.Normal = box.Vertices[i].Normal;
-        v.TexC = box.Vertices[i].TexC;
-        boxVertex[i] = std::move(v);
-    }
-    
-    // box geometry
-    std::unique_ptr<d3dUtil::MeshGeometry> boxGeom = std::make_unique<d3dUtil::MeshGeometry>();
-    vbByteSize = sizeof(Vertex) * boxVertex.size();
-    ibByteSize = sizeof(uint16_t) * box.GetIndices16().size();
-    ThrowIfFailed(D3DCreateBlob(vbByteSize, boxGeom->VertexBufferCPU.GetAddressOf()));
-    ThrowIfFailed(D3DCreateBlob(ibByteSize, boxGeom->IndexBufferCPU.GetAddressOf()));
-    CopyMemory(boxGeom->VertexBufferCPU->GetBufferPointer(), boxVertex.data(), vbByteSize);
-    CopyMemory(boxGeom->IndexBufferCPU->GetBufferPointer(), box.GetIndices16().data(), ibByteSize);
+        // Floor: Observe we tile texture coordinates.
+        Vertex(-3.5f, 0.0f, -10.0f, 0.0f, 1.0f, 0.0f, 0.0f, 4.0f), // 0 
+        Vertex(-3.5f, 0.0f,   0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f),
+        Vertex(7.5f, 0.0f,   0.0f, 0.0f, 1.0f, 0.0f, 4.0f, 0.0f),
+        Vertex(7.5f, 0.0f, -10.0f, 0.0f, 1.0f, 0.0f, 4.0f, 4.0f),
 
-    boxGeom->Name = "box";
-    boxGeom->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(m_Device.Get(), m_CommandList.Get(),
-        boxGeom->VertexBufferCPU->GetBufferPointer(), vbByteSize, boxGeom->VertexBufferUploader);
-    boxGeom->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(m_Device.Get(), m_CommandList.Get(),
-        boxGeom->IndexBufferCPU->GetBufferPointer(), ibByteSize, boxGeom->IndexBufferUploader);
-    boxGeom->VertexByteStride = sizeof(Vertex);
-    boxGeom->VertexByteSize = vbByteSize;
-    boxGeom->IndexBufferByteSize = ibByteSize;
-    boxGeom->IndexFormat = DXGI_FORMAT_R16_UINT;
-    d3dUtil::SubmeshGeometry boxSub;
-    boxSub.IndexCount = box.GetIndices16().size();
-    boxSub.StartIndexLocation = 0;
-    boxSub.BaseVertexLocation = 0;
-    boxGeom->DrawArgs["box"] = std::move(boxSub);
-    m_Geometries[boxGeom->Name] = std::move(boxGeom);
+        // Wall: Observe we tile texture coordinates, and that we
+        // leave a gap in the middle for the mirror.
+        Vertex(-3.5f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 2.0f), // 4
+        Vertex(-3.5f, 4.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f),
+        Vertex(-2.5f, 4.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.5f, 0.0f),
+        Vertex(-2.5f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.5f, 2.0f),
 
-    // sea Geometry
-    m_SeaUploaderBuffer = std::make_unique<UploadBuffer<Vertex>>(m_Device.Get(), land.Vertices.size(), false);
-    for (UINT i = 0; i < land.Vertices.size(); ++i)
+        Vertex(2.5f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 2.0f), // 8 
+        Vertex(2.5f, 4.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f),
+        Vertex(7.5f, 4.0f, 0.0f, 0.0f, 0.0f, -1.0f, 2.0f, 0.0f),
+        Vertex(7.5f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 2.0f, 2.0f),
+
+        Vertex(-3.5f, 4.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f), // 12
+        Vertex(-3.5f, 6.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f),
+        Vertex(7.5f, 6.0f, 0.0f, 0.0f, 0.0f, -1.0f, 6.0f, 0.0f),
+        Vertex(7.5f, 4.0f, 0.0f, 0.0f, 0.0f, -1.0f, 6.0f, 1.0f),
+
+        // Mirror
+        Vertex(-2.5f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f), // 16
+        Vertex(-2.5f, 4.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f),
+        Vertex(2.5f, 4.0f, 0.0f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f),
+        Vertex(2.5f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 1.0f, 1.0f)
+    };
+    std::array<std::int16_t, 30> indices =
     {
-        Vertex v;
-        v.Pos.x = land.Vertices[i].Position.x;
-        v.Pos.y = land.Vertices[i].Position.y;
-        v.Pos.z = land.Vertices[i].Position.z;
-        v.Normal.x = 0.0f;
-        v.Normal.y = 1.0f;
-        v.Normal.z = 0.0f;
-        v.TexC.x = land.Vertices[i].TexC.x;
-        v.TexC.y = land.Vertices[i].TexC.y;
+        // Floor
+        0, 1, 2,
+        0, 2, 3,
 
-        m_SeaUploaderBuffer->CopyData(i, v);
-    }
-    std::unique_ptr<d3dUtil::MeshGeometry> seaGeo = std::make_unique<d3dUtil::MeshGeometry>();
-    vbByteSize = sizeof(Vertex) * land.Vertices.size();
-    ibByteSize = sizeof(uint16_t) * land.GetIndices16().size();
-    ThrowIfFailed(D3DCreateBlob(vbByteSize, seaGeo->VertexBufferCPU.GetAddressOf()));
-    ThrowIfFailed(D3DCreateBlob(ibByteSize, seaGeo->IndexBufferCPU.GetAddressOf()));
-    CopyMemory(seaGeo->VertexBufferCPU->GetBufferPointer(), landVertex.data(), vbByteSize);
-    CopyMemory(seaGeo->IndexBufferCPU->GetBufferPointer(), land.GetIndices16().data(), ibByteSize);
-    seaGeo->Name = "sea";
-    seaGeo->VertexBufferGPU = (ID3D12Resource*)*m_SeaUploaderBuffer;
-    seaGeo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(m_Device.Get(), m_CommandList.Get(), seaGeo->IndexBufferCPU->GetBufferPointer(),
-        ibByteSize, seaGeo->IndexBufferUploader);
-    seaGeo->VertexByteStride = sizeof(Vertex);
-    seaGeo->VertexByteSize = sizeof(Vertex) * landVertex.size();
-    seaGeo->IndexBufferByteSize = sizeof(uint16_t) * land.GetIndices16().size();
-    d3dUtil::SubmeshGeometry seaSub;
-    seaSub.IndexCount = land.GetIndices16().size();
-    seaSub.StartIndexLocation = 0;
-    seaSub.BaseVertexLocation = 0;
-    seaGeo->DrawArgs["sea"] = std::move(seaSub);
-    m_Geometries[seaGeo->Name] = std::move(seaGeo);
+        // Walls
+        4, 5, 6,
+        4, 6, 7,
+
+        8, 9, 10,
+        8, 10, 11,
+
+        12, 13, 14,
+        12, 14, 15,
+
+        // Mirror
+        16, 17, 18,
+        16, 18, 19
+    };
+    std::unique_ptr<d3dUtil::MeshGeometry> roomGeo = std::make_unique<d3dUtil::MeshGeometry>();
+    roomGeo->Name = "room";
+    UINT vbBytes = sizeof(Vertex) * vertices.size();
+    UINT ibBytes = sizeof(uint16_t) * indices.size();
+    ThrowIfFailed(D3DCreateBlob(vbBytes, roomGeo->VertexBufferCPU.GetAddressOf()));
+    ThrowIfFailed(D3DCreateBlob(ibBytes, roomGeo->IndexBufferCPU.GetAddressOf()));
+    CopyMemory(roomGeo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbBytes);
+    CopyMemory(roomGeo->IndexBufferCPU->GetBufferPointer(), indices.data(), ibBytes);
+    roomGeo->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(m_Device.Get(),
+        m_CommandList.Get(), roomGeo->VertexBufferCPU->GetBufferPointer(),
+        vbBytes, roomGeo->VertexBufferUploader);
+    roomGeo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(m_Device.Get(),
+        m_CommandList.Get(), roomGeo->IndexBufferCPU->GetBufferPointer(),
+        ibBytes, roomGeo->IndexBufferUploader);
+    roomGeo->VertexByteStride = sizeof(Vertex);
+    roomGeo->VertexByteSize = vbBytes;
+    roomGeo->IndexFormat = DXGI_FORMAT_R16_UINT;
+    roomGeo->IndexBufferByteSize = ibBytes;
+
+    d3dUtil::SubmeshGeometry wall;
+    wall.IndexCount = 18;
+    wall.StartIndexLocation = 6;
+    wall.BaseVertexLocation = 0;
+
+    d3dUtil::SubmeshGeometry floor;
+    floor.IndexCount = 6;
+    floor.StartIndexLocation = 0;
+    floor.BaseVertexLocation = 0;
+
+    d3dUtil::SubmeshGeometry mirror;
+    mirror.IndexCount = 6;
+    mirror.StartIndexLocation = 24;
+    mirror.BaseVertexLocation = 0;
+
+    roomGeo->DrawArgs["wall"] = wall;
+    roomGeo->DrawArgs["floor"] = floor;
+    roomGeo->DrawArgs["mirror"] = mirror;
+    m_Geometries[roomGeo->Name] = std::move(roomGeo);
 }
 
 void MaterialApp::CreateMaterial()
 {
-    std::unique_ptr<d3dUtil::Material> grass = std::make_unique<d3dUtil::Material>();
-    grass->Name = "land";
-    grass->MatCBIndex = 0;
-    grass->DiffuseSrvHeapIndex = 3;
-    grass->DiffuseAlbedo = DirectX::XMFLOAT4(0.2f, 0.6f, 0.2f, 1.0f);
-    grass->FresnelR0 = DirectX::XMFLOAT3(0.01f, 0.01f, 0.01f);
-    grass->Roughness = 0.125f;
+    std::unique_ptr<d3dUtil::Material> bricks = std::make_unique<d3dUtil::Material>();
+    bricks->Name = "bricks";
+    bricks->MatCBIndex = 0;
+    bricks->DiffuseSrvHeapIndex = 0;
+    bricks->DiffuseAlbedo = DirectX::XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+    bricks->FresnelR0 = DirectX::XMFLOAT3(0.05f, 0.05f, 0.05f);
+    bricks->Roughness = 0.25f;
 
-    //当前这种水的材质定义得并不是很好，但是由于我们还未学会所需的全部渲染工具（如透明度、环境反射等），因此暂时先用这些数据解决
-    auto water = std::make_unique<d3dUtil::Material>();
-    water->Name = "sea";
-    water->MatCBIndex = 1;
-    water->DiffuseSrvHeapIndex = 2;
-    water->DiffuseAlbedo = DirectX::XMFLOAT4(0.0f, 0.2f, 0.6f, 0.6f);
-    water->FresnelR0 = DirectX::XMFLOAT3(0.1f, 0.1f, 0.1f);
-    water->Roughness = 0.0f;
-    
-    auto box = std::make_unique<d3dUtil::Material>();
-    box->Name = "box";
-    box->MatCBIndex = 2;
-    box->DiffuseSrvHeapIndex = 0;
-    box->DiffuseAlbedo = DirectX::XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-    box->FresnelR0 = DirectX::XMFLOAT3(0.01f, 0.01f, 0.01f);
-    box->Roughness = 0.125f;
-    
-    m_Materials[grass->Name] = std::move(grass);
-    m_Materials[water->Name] = std::move(water);
-    m_Materials[box->Name] = std::move(box);
+    std::unique_ptr<d3dUtil::Material> checkertile = std::make_unique<d3dUtil::Material>();
+    checkertile->Name = "checkertile";
+    checkertile->MatCBIndex = 1;
+    checkertile->DiffuseSrvHeapIndex = 1;
+    checkertile->DiffuseAlbedo = DirectX::XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+    checkertile->FresnelR0 = DirectX::XMFLOAT3(0.07f, 0.07f, 0.07f);
+    checkertile->Roughness = 0.3f;
+
+    std::unique_ptr<d3dUtil::Material> icemirror = std::make_unique<d3dUtil::Material>();
+    icemirror->Name = "icemirror";
+    icemirror->MatCBIndex = 2;
+    icemirror->DiffuseSrvHeapIndex = 2;
+    icemirror->DiffuseAlbedo = DirectX::XMFLOAT4(1.0f, 1.0f, 1.0f, 0.3f);
+    icemirror->FresnelR0 = DirectX::XMFLOAT3(0.1f, 0.1f, 0.1f);
+    icemirror->Roughness = 0.5f;
+
+    std::unique_ptr<d3dUtil::Material> skullMat = std::make_unique<d3dUtil::Material>();
+    skullMat->Name = "skull";
+    skullMat->MatCBIndex = 3;
+    skullMat->DiffuseSrvHeapIndex = 3;
+    skullMat->DiffuseAlbedo = DirectX::XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+    skullMat->FresnelR0 = DirectX::XMFLOAT3(0.05f, 0.05f, 0.05f);
+    skullMat->Roughness = 0.3f;
+
+    std::unique_ptr<d3dUtil::Material> defaultMat = std::make_unique<d3dUtil::Material>();
+    defaultMat->Name = "default";
+    defaultMat->MatCBIndex = 4;
+    defaultMat->DiffuseSrvHeapIndex = 3;
+    defaultMat->DiffuseAlbedo = DirectX::XMFLOAT4(0.0f, 0.0f, 0.0f, 0.5f);
+    defaultMat->FresnelR0 = DirectX::XMFLOAT3(0.001f, 0.001f, 0.001f);
+    defaultMat->Roughness = 0.0f;
+
+    m_Materials[bricks->Name] = std::move(bricks);
+    m_Materials[checkertile->Name] = std::move(checkertile);
+    m_Materials[icemirror->Name] = std::move(icemirror);
+    m_Materials[skullMat->Name] = std::move(skullMat);
+    m_Materials[defaultMat->Name] = std::move(defaultMat);
 }
 
 void MaterialApp::CreateFrameResources()
 {
     for (UINT i = 0; i < gNumFrameResources; i++)
     {
-        m_FrameResources.push_back(std::make_unique<FrameResource>(m_Device.Get(), 1, m_RenderItems.size(), m_Materials.size()));
+        m_FrameResources.push_back(std::make_unique<FrameResource>(m_Device.Get(), 2, m_RenderItems.size(), m_Materials.size()));
     }
 }
 
-
-void MaterialApp::CreateRenderItems()
+void MaterialApp::CreateShullBoxRenderItems()
 {
-    std::unique_ptr<RenderItem> landRitem = std::make_unique<RenderItem>();
-    landRitem->ObjCBIndex = 0;
-    landRitem->Geo = m_Geometries["land"].get();
-    landRitem->mat = m_Materials["land"].get();
-    landRitem->Geo = m_Geometries["land"].get();
-    landRitem->IndexCount = landRitem->Geo->DrawArgs["land"].IndexCount;
-    landRitem->StartIndexLocation = landRitem->Geo->DrawArgs["land"].StartIndexLocation;
-    landRitem->BaseVertexLocation = landRitem->Geo->DrawArgs["land"].BaseVertexLocation;
-    landRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+    DirectX::XMVECTOR up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+    std::unique_ptr<RenderItem> skullRit = std::make_unique<RenderItem>();
+    skullRit->ObjCBIndex = 0;
+    DirectX::XMMATRIX SkullWorld = DirectX::XMLoadFloat4x4(&skullRit->World);
+    SkullWorld = DirectX::XMMatrixMultiply(SkullWorld, DirectX::XMMatrixRotationAxis(up, DirectX::XMConvertToRadians(90.0f)));
+    SkullWorld = DirectX::XMMatrixMultiply(SkullWorld, DirectX::XMMatrixScaling(0.5f, 0.5f, 0.5f));
+    SkullWorld = DirectX::XMMatrixMultiply(SkullWorld, DirectX::XMMatrixTranslation(-3.0f, 1.0f, -5.6f));
+    DirectX::XMStoreFloat4x4(&skullRit->World, SkullWorld);
+    skullRit->Geo = m_Geometries["Shull"].get();
+    skullRit->mat = m_Materials["skull"].get();
+    skullRit->IndexCount = skullRit->Geo->DrawArgs["shull"].IndexCount;
+    skullRit->StartIndexLocation = skullRit->Geo->DrawArgs["shull"].StartIndexLocation;
+    skullRit->BaseVertexLocation = skullRit->Geo->DrawArgs["shull"].BaseVertexLocation;
+    skullRit->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+    m_PassRenderItems[(int)RenderLayer::Opaque].push_back(skullRit.get());
+    m_RenderItems.push_back(std::move(skullRit));
+    
+    
+    std::unique_ptr<RenderItem> wallRit = std::make_unique<RenderItem>();
+    wallRit->ObjCBIndex = 1;
+    wallRit->Geo = m_Geometries["room"].get();
+    wallRit->mat = m_Materials["bricks"].get();
+    wallRit->IndexCount = wallRit->Geo->DrawArgs["wall"].IndexCount;
+    wallRit->StartIndexLocation = wallRit->Geo->DrawArgs["wall"].StartIndexLocation;
+    wallRit->BaseVertexLocation = wallRit->Geo->DrawArgs["wall"].BaseVertexLocation;
+    wallRit->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+    m_PassRenderItems[(int)RenderLayer::Opaque].push_back(wallRit.get());
+    m_RenderItems.push_back(std::move(wallRit));
 
-    std::unique_ptr<RenderItem> seaRitem = std::make_unique<RenderItem>();
-    seaRitem->ObjCBIndex = 1;
-    seaRitem->Geo = m_Geometries["sea"].get();
-    seaRitem->mat = m_Materials["sea"].get();
-    seaRitem->IndexCount = seaRitem->Geo->DrawArgs["sea"].IndexCount;
-    seaRitem->BaseVertexLocation = seaRitem->Geo->DrawArgs["sea"].BaseVertexLocation;
-    seaRitem->StartIndexLocation = seaRitem->Geo->DrawArgs["sea"].StartIndexLocation;
-    seaRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+    
+    std::unique_ptr<RenderItem> floorRit = std::make_unique<RenderItem>();
+    floorRit->ObjCBIndex = 2;
+    floorRit->Geo = m_Geometries["room"].get();
+    floorRit->mat = m_Materials["checkertile"].get();
+    floorRit->IndexCount = floorRit->Geo->DrawArgs["floor"].IndexCount;
+    floorRit->StartIndexLocation = floorRit->Geo->DrawArgs["floor"].StartIndexLocation;
+    floorRit->BaseVertexLocation = floorRit->Geo->DrawArgs["floor"].BaseVertexLocation;
+    floorRit->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+    m_PassRenderItems[(int)RenderLayer::Opaque].push_back(floorRit.get());
+    m_RenderItems.push_back(std::move(floorRit));
+    
+    //Mirror pass
+    std::unique_ptr<RenderItem> mirrorRit = std::make_unique<RenderItem>();
+    mirrorRit->ObjCBIndex = 3;
+    mirrorRit->Geo = m_Geometries["room"].get();
+    mirrorRit->mat = m_Materials["icemirror"].get();
+    mirrorRit->IndexCount = mirrorRit->Geo->DrawArgs["mirror"].IndexCount;
+    mirrorRit->StartIndexLocation = mirrorRit->Geo->DrawArgs["mirror"].StartIndexLocation;
+    mirrorRit->BaseVertexLocation = mirrorRit->Geo->DrawArgs["mirror"].BaseVertexLocation;
+    mirrorRit->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+    m_PassRenderItems[(int)RenderLayer::Mirrors].push_back(mirrorRit.get());
+    m_RenderItems.push_back(std::move(mirrorRit));
 
-    std::unique_ptr<RenderItem> boxRitem = std::make_unique<RenderItem>();
-    boxRitem->ObjCBIndex = 2;
-    DirectX::XMMATRIX worldMatrix = DirectX::XMMatrixIdentity();
-    worldMatrix *= DirectX::XMMatrixTranslation(0.0f, 8.0f, 0.0f);
-    DirectX::XMStoreFloat4x4(&boxRitem->World, worldMatrix);
-    boxRitem->Geo = m_Geometries["box"].get();
-    boxRitem->mat = m_Materials["box"].get();
-    boxRitem->IndexCount = boxRitem->Geo->DrawArgs["box"].IndexCount;
-    boxRitem->StartIndexLocation = boxRitem->Geo->DrawArgs["box"].StartIndexLocation;
-    boxRitem->BaseVertexLocation = boxRitem->Geo->DrawArgs["box"].BaseVertexLocation;
-    boxRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-    DirectX::XMMATRIX boxTexTransform = DirectX::XMLoadFloat4x4(&boxRitem->TexTransform);
-    boxTexTransform = DirectX::XMMatrixMultiply(boxTexTransform, DirectX::XMMatrixScaling(5.0f, 5.0f, 1.0f));
-    DirectX::XMStoreFloat4x4(&boxRitem->TexTransform, DirectX::XMMatrixTranspose(boxTexTransform));
-    m_RenderItems.push_back(std::move(landRitem));
-    m_RenderItems.push_back(std::move(seaRitem));
-    m_RenderItems.push_back(std::move(boxRitem));
+    //ReflectionPass
+    DirectX::XMVECTOR ReflectFaceNormal = DirectX::XMVectorSet(0.0f, 0.0f, -1.0f, 0.0f);
+    DirectX::XMMATRIX ReflectionMatrix = DirectX::XMMatrixReflect(ReflectFaceNormal);
+    std::unique_ptr<RenderItem> skullReflectRit = std::make_unique<RenderItem>();
+    skullReflectRit->ObjCBIndex = 4;
+    DirectX::XMMATRIX SkullReflectWorld = DirectX::XMLoadFloat4x4(&skullReflectRit->World);
+    SkullReflectWorld = DirectX::XMMatrixMultiply(SkullWorld, DirectX::XMMatrixTranslation(0.0f, 0.0f, 11.2f));
+    //SkullReflectWorld = SkullWorld * ReflectionMatrix;
+    DirectX::XMStoreFloat4x4(&skullReflectRit->World, SkullReflectWorld);
+    skullReflectRit->Geo = m_Geometries["Shull"].get();
+    skullReflectRit->mat = m_Materials["skull"].get();
+    skullReflectRit->IndexCount = skullReflectRit->Geo->DrawArgs["shull"].IndexCount;
+    skullReflectRit->StartIndexLocation = skullReflectRit->Geo->DrawArgs["shull"].StartIndexLocation;
+    skullReflectRit->BaseVertexLocation = skullReflectRit->Geo->DrawArgs["shull"].BaseVertexLocation;
+    skullReflectRit->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+    m_PassRenderItems[(int)RenderLayer::Reflected].push_back(skullReflectRit.get());
+    m_RenderItems.push_back(std::move(skullReflectRit));
+
+    // transparent
+    std::unique_ptr<RenderItem> transparentMirror = std::make_unique<RenderItem>();
+    transparentMirror->ObjCBIndex = 5;
+    transparentMirror->Geo = m_Geometries["room"].get();
+    transparentMirror->mat = m_Materials["icemirror"].get();
+    transparentMirror->IndexCount = transparentMirror->Geo->DrawArgs["mirror"].IndexCount;
+    transparentMirror->BaseVertexLocation = transparentMirror->Geo->DrawArgs["mirror"].BaseVertexLocation;
+    transparentMirror->StartIndexLocation = transparentMirror->Geo->DrawArgs["mirror"].StartIndexLocation;
+    transparentMirror->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+    m_PassRenderItems[(int)RenderLayer::Transparent].push_back(transparentMirror.get());
+    m_RenderItems.push_back(std::move(transparentMirror));
+
+    // shadow
+                                                        DirectX::XMVECTOR Direction = DirectX::XMVectorSet(0.57735f, -0.57735f, 0.57735f, 0.0f);
+                                                        Direction = DirectX::XMVectorMultiply(Direction, DirectX::XMVectorSet(-1.0f, -1.0f, -1.0f, 0.0f));
+                                                        DirectX::XMVECTOR shadowPlane = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f); // xz plane
+                                                        DirectX::XMMATRIX shadowMatrix = DirectX::XMMatrixShadow(shadowPlane, Direction);
+                                                    
+                                                        DirectX::XMMATRIX shadowWorld = SkullWorld * shadowMatrix;
+                                                        shadowWorld = shadowWorld * DirectX::XMMatrixTranslation(0.0f, 0.001f, 0.0f);
+                                                        
+                                                        std::unique_ptr<RenderItem> shadowSkull = std::make_unique<RenderItem>();
+                                                        shadowSkull->ObjCBIndex = 6;
+                                                        DirectX::XMStoreFloat4x4(&shadowSkull->World, shadowWorld);
+                                                        shadowSkull->Geo = m_Geometries["Shull"].get();
+                                                        shadowSkull->mat = m_Materials["default"].get();
+                                                        shadowSkull->IndexCount = shadowSkull->Geo->DrawArgs["shull"].IndexCount;
+                                                        shadowSkull->StartIndexLocation = shadowSkull->Geo->DrawArgs["shull"].StartIndexLocation;
+                                                        shadowSkull->BaseVertexLocation = shadowSkull->Geo->DrawArgs["shull"].BaseVertexLocation;
+                                                        shadowSkull->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+                                                        m_PassRenderItems[(int)RenderLayer::Shadow].push_back(shadowSkull.get());
+                                                        m_RenderItems.push_back(std::move(shadowSkull));
 }
 
 
@@ -348,6 +475,7 @@ void MaterialApp::CreateShaderAndInputLayout()
     const D3D_SHADER_MACRO defines[] = {
         {"FOG", "1"},
         {"ALPHA_TEST", "1"},
+        {"NUM_DIR_LIGHTS", "3"},
         {nullptr, nullptr}
     };
     m_VSShader = d3dUtil::CompileShader(L"source/shader/Texture.usf", nullptr, "VS", "vs_5_0");
@@ -392,219 +520,223 @@ void MaterialApp::CreateSRVDescriptorHeap()
 
 void MaterialApp::CreateSRVView()
 {
-    //1. create vie
-    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-    ID3D12Resource* woodTex = m_Textures["woodCrateTex"]->Resource.Get();
-    srvDesc.Format = woodTex->GetDesc().Format;
-    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvDesc.Texture2D.MipLevels = woodTex->GetDesc().MipLevels;
-    srvDesc.Texture2D.MostDetailedMip = 0;
-    srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
-
+    // create brick view 
     CD3DX12_CPU_DESCRIPTOR_HANDLE handle(m_SRVDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
-    
-    m_Device->CreateShaderResourceView(m_Textures["woodCrateTex"]->Resource.Get(),
-       &srvDesc, handle);
+    ID3D12Resource* brickResource = m_Textures["bricksTex"]->Resource.Get();
+    D3D12_SHADER_RESOURCE_VIEW_DESC pShaderResourceViewDesc{};
+    pShaderResourceViewDesc.Format = brickResource->GetDesc().Format;
+    pShaderResourceViewDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    pShaderResourceViewDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    pShaderResourceViewDesc.Texture2D.MostDetailedMip = 0;
+    pShaderResourceViewDesc.Texture2D.MipLevels = brickResource->GetDesc().MipLevels;
+    pShaderResourceViewDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+    m_Device->CreateShaderResourceView(brickResource, &pShaderResourceViewDesc, handle);
 
-    ID3D12Resource* defaultTex = m_Textures["default"]->Resource.Get();
-    srvDesc.Format = defaultTex->GetDesc().Format;
-    srvDesc.Texture2D.MipLevels = defaultTex->GetDesc().MipLevels;
+    //create checkboard
+    ID3D12Resource* checkboardResource = m_Textures["checkboardTex"]->Resource.Get();
+    pShaderResourceViewDesc.Format = checkboardResource->GetDesc().Format;
+    pShaderResourceViewDesc.Texture2D.MipLevels = checkboardResource->GetDesc().MipLevels;
     handle.Offset(1, m_CbvSrvUavDescriptorSize);
-    m_Device->CreateShaderResourceView(m_Textures["default"]->Resource.Get(),
-        &srvDesc, handle);
+    m_Device->CreateShaderResourceView(checkboardResource, &pShaderResourceViewDesc, handle);
 
+    //create ice
+    ID3D12Resource* iceResource = m_Textures["iceTex"]->Resource.Get();
+    pShaderResourceViewDesc.Format = iceResource->GetDesc().Format;
+    pShaderResourceViewDesc.Texture2D.MipLevels = iceResource->GetDesc().MipLevels;
     handle.Offset(1, m_CbvSrvUavDescriptorSize);
-    ID3D12Resource* seaTex = m_Textures["sea"]->Resource.Get();
-    srvDesc.Format = seaTex->GetDesc().Format;
-    srvDesc.Texture2D.MipLevels = seaTex->GetDesc().MipLevels;
-    m_Device->CreateShaderResourceView(m_Textures["sea"]->Resource.Get(), &srvDesc, handle);
+    m_Device->CreateShaderResourceView(iceResource, &pShaderResourceViewDesc, handle);
 
+    // create default
+    ID3D12Resource* defaultResource = m_Textures["defaultWhiteTex"]->Resource.Get();
+    pShaderResourceViewDesc.Format = defaultResource->GetDesc().Format;
+    pShaderResourceViewDesc.Texture2D.MipLevels = defaultResource->GetDesc().MipLevels;
     handle.Offset(1, m_CbvSrvUavDescriptorSize);
-    ID3D12Resource* grassTex = m_Textures["grass"]->Resource.Get();
-    srvDesc.Format = grassTex->GetDesc().Format;
-    srvDesc.Texture2D.MipLevels = grassTex->GetDesc().MipLevels;
-    m_Device->CreateShaderResourceView(grassTex, &srvDesc, handle);
+    m_Device->CreateShaderResourceView(defaultResource, &pShaderResourceViewDesc, handle);
 }
 
 
 void MaterialApp::LoadTextureResources()
 {
-    std::unique_ptr<Texture> woodCrateTex = std::make_unique<Texture>();
-    woodCrateTex->Name = "woodCrateTex";
-    woodCrateTex->FileName = L"Textures/WireFence.dds";
-    woodCrateTex->AlphaMode = DirectX::DDS_ALPHA_MODE_OPAQUE;
-    woodCrateTex->is_cube = false;
-    ThrowIfFailed(DirectX::LoadDDSTextureFromFile(m_Device.Get(),
-        woodCrateTex->FileName.c_str(),
-        woodCrateTex->Resource.GetAddressOf(),
-        woodCrateTex->Data,
-        woodCrateTex->SubResourceData,
-        0,
-        &woodCrateTex->AlphaMode,
-        &woodCrateTex->is_cube
-        ));
-    CD3DX12_RESOURCE_BARRIER pBarrier = CD3DX12_RESOURCE_BARRIER::Transition(woodCrateTex->Resource.Get(),
-        D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
-    m_CommandList->ResourceBarrier(1, &pBarrier);
-    
-    // subresource has data
-    CD3DX12_HEAP_PROPERTIES pP(D3D12_HEAP_TYPE_UPLOAD);
-    UINT byteSize = GetRequiredIntermediateSize(woodCrateTex->Resource.Get(), 0,
-        woodCrateTex->SubResourceData.size());
-    CD3DX12_RESOURCE_DESC pD = CD3DX12_RESOURCE_DESC::Buffer(byteSize);
-    ThrowIfFailed(m_Device->CreateCommittedResource(&pP,
-        D3D12_HEAP_FLAG_NONE,
-        &pD, D3D12_RESOURCE_STATE_GENERIC_READ,
-        nullptr, IID_PPV_ARGS(woodCrateTex->UploadHeap.GetAddressOf())
-        ));
-
-    UpdateSubresources(m_CommandList.Get(),
-        woodCrateTex->Resource.Get(),
-        woodCrateTex->UploadHeap.Get(),
-        0, 0, woodCrateTex->SubResourceData.size(),
-        woodCrateTex->SubResourceData.data());
-
-    pBarrier = CD3DX12_RESOURCE_BARRIER::Transition(woodCrateTex->Resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST,
-        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-    
-    m_CommandList->ResourceBarrier(1, &pBarrier);
-    m_Textures[woodCrateTex->Name] = std::move(woodCrateTex);
-
-    //grass
-    std::unique_ptr<Texture> mountainTex = std::make_unique<Texture>();
-    mountainTex->Name = "grass";
-    mountainTex->FileName = L"Textures/grass.dds";
-    mountainTex->AlphaMode = DirectX::DDS_ALPHA_MODE_OPAQUE;
-    mountainTex->is_cube = false;
-    DirectX::LoadDDSTextureFromFile(m_Device.Get(), mountainTex->FileName.c_str(),
-        mountainTex->Resource.GetAddressOf(), mountainTex->Data,
-        mountainTex->SubResourceData, 0, &mountainTex->AlphaMode, &mountainTex->is_cube);
-    CD3DX12_HEAP_PROPERTIES grassHeap(D3D12_HEAP_TYPE_UPLOAD);
-    UINT64 grassSize = GetRequiredIntermediateSize(mountainTex->Resource.Get(), 0, mountainTex->SubResourceData.size());
-    CD3DX12_RESOURCE_DESC grassDesc = CD3DX12_RESOURCE_DESC::Buffer(grassSize);
-    ThrowIfFailed(m_Device->CreateCommittedResource(&grassHeap,
-        D3D12_HEAP_FLAG_NONE, &grassDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
-        IID_PPV_ARGS(mountainTex->UploadHeap.GetAddressOf())));
-    CD3DX12_RESOURCE_BARRIER grasspB = CD3DX12_RESOURCE_BARRIER::Transition(mountainTex->Resource.Get(),
-        D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
-    m_CommandList->ResourceBarrier(1, &grasspB);
-    UpdateSubresources(m_CommandList.Get(), mountainTex->Resource.Get(), mountainTex->UploadHeap.Get(),
-        0, 0, mountainTex->SubResourceData.size(), mountainTex->SubResourceData.data());
-    grasspB = CD3DX12_RESOURCE_BARRIER::Transition(mountainTex->Resource.Get(),
-        D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
-    m_CommandList->ResourceBarrier(1, &grasspB);
-    m_Textures[mountainTex->Name] = std::move(mountainTex);
-}
-
-void MaterialApp::LoadSeaTextureResource()
-{
-    std::unique_ptr<Texture> seaTex = std::make_unique<Texture>();
-    seaTex->Name = "sea";
-    seaTex->FileName = L"Textures/water1.dds";
-    seaTex->AlphaMode = DirectX::DDS_ALPHA_MODE_STRAIGHT;
-    seaTex->is_cube = false;
-    DirectX::LoadDDSTextureFromFile(m_Device.Get(), seaTex->FileName.c_str(),
-        seaTex->Resource.GetAddressOf(), seaTex->Data, seaTex->SubResourceData,
-        0, &seaTex->AlphaMode, &seaTex->is_cube);
-    CD3DX12_RESOURCE_BARRIER pB = CD3DX12_RESOURCE_BARRIER::Transition(seaTex->Resource.Get(), D3D12_RESOURCE_STATE_COMMON,
+    CD3DX12_RESOURCE_BARRIER pBarrier;
+    std::unique_ptr<Texture> bricksTex = std::make_unique<Texture>();
+    bricksTex->Name = "bricksTex";
+    bricksTex->FileName = L"Textures/bricks.dds";
+    bricksTex->AlphaMode = DirectX::DDS_ALPHA_MODE_OPAQUE;
+    bricksTex->is_cube = false;
+    ThrowIfFailed(DirectX::LoadDDSTextureFromFile(
+        m_Device.Get(),
+        bricksTex->FileName.c_str(),
+        bricksTex->Resource.GetAddressOf(),
+        bricksTex->Data,
+        bricksTex->SubResourceData,
+        0, &bricksTex->AlphaMode,
+        &bricksTex->is_cube
+    ));
+    pBarrier = CD3DX12_RESOURCE_BARRIER::Transition(bricksTex->Resource.Get(),
+        D3D12_RESOURCE_STATE_COMMON,
         D3D12_RESOURCE_STATE_COPY_DEST);
-    m_CommandList->ResourceBarrier(1, &pB);
-    CD3DX12_HEAP_PROPERTIES pP = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-    UINT64 dataSize = GetRequiredIntermediateSize(seaTex->Resource.Get(), 0, seaTex->SubResourceData.size());
-    CD3DX12_RESOURCE_DESC pD = CD3DX12_RESOURCE_DESC::Buffer(dataSize);
-    ThrowIfFailed(m_Device->CreateCommittedResource(&pP, D3D12_HEAP_FLAG_NONE, &pD, D3D12_RESOURCE_STATE_GENERIC_READ,
-        nullptr, IID_PPV_ARGS(seaTex->UploadHeap.GetAddressOf())));
-    UpdateSubresources(m_CommandList.Get(), seaTex->Resource.Get(), seaTex->UploadHeap.Get(), 0,
-        0, seaTex->SubResourceData.size(), seaTex->SubResourceData.data());
-    pB = CD3DX12_RESOURCE_BARRIER::Transition(seaTex->Resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST,
-        D3D12_RESOURCE_STATE_COMMON);
-    m_CommandList->ResourceBarrier(1, &pB);
-    m_Textures[seaTex->Name] = std::move(seaTex);
-}
+    m_CommandList->ResourceBarrier(1, &pBarrier);
+    CD3DX12_HEAP_PROPERTIES brickP(D3D12_HEAP_TYPE_UPLOAD);
+    UINT64 brickDescSize = GetRequiredIntermediateSize(bricksTex->Resource.Get(),
+        0, bricksTex->SubResourceData.size());
+    CD3DX12_RESOURCE_DESC brickDesc = CD3DX12_RESOURCE_DESC::Buffer(brickDescSize);
+    ThrowIfFailed(m_Device->CreateCommittedResource(
+        &brickP,
+        D3D12_HEAP_FLAG_NONE,
+        &brickDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(bricksTex->UploadHeap.GetAddressOf())
+    ));
+    UpdateSubresources(m_CommandList.Get(),
+        bricksTex->Resource.Get(), bricksTex->UploadHeap.Get(),
+        0, 0, bricksTex->SubResourceData.size(), bricksTex->SubResourceData.data());
+    pBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
+        bricksTex->Resource.Get(),
+        D3D12_RESOURCE_STATE_COPY_DEST,
+        D3D12_RESOURCE_STATE_COMMON
+    );
+    m_CommandList->ResourceBarrier(1, &pBarrier);
+    m_Textures[bricksTex->Name] = std::move(bricksTex);
+    
+    std::unique_ptr<Texture> checkboardTex = std::make_unique<Texture>();
+    checkboardTex->Name = "checkboardTex";
+    checkboardTex->FileName = L"Textures/checkboard.dds";
+    checkboardTex->AlphaMode = DirectX::DDS_ALPHA_MODE_OPAQUE;
+    checkboardTex->is_cube = false;
+    ThrowIfFailed(DirectX::LoadDDSTextureFromFile(
+        m_Device.Get(),
+        checkboardTex->FileName.c_str(),
+        checkboardTex->Resource.GetAddressOf(),
+        checkboardTex->Data,
+        checkboardTex->SubResourceData,
+        0, &checkboardTex->AlphaMode,
+        &checkboardTex->is_cube
+    ));
+    pBarrier = CD3DX12_RESOURCE_BARRIER::Transition(checkboardTex->Resource.Get(),
+        D3D12_RESOURCE_STATE_COMMON,
+        D3D12_RESOURCE_STATE_COPY_DEST);
+    m_CommandList->ResourceBarrier(1, &pBarrier);
+    CD3DX12_HEAP_PROPERTIES checkboardP(D3D12_HEAP_TYPE_UPLOAD);
+    UINT64 checkboardDescSize = GetRequiredIntermediateSize(checkboardTex->Resource.Get(),
+        0, checkboardTex->SubResourceData.size());
+    CD3DX12_RESOURCE_DESC checkboardDesc = CD3DX12_RESOURCE_DESC::Buffer(checkboardDescSize);
+    ThrowIfFailed(m_Device->CreateCommittedResource(
+        &checkboardP,
+        D3D12_HEAP_FLAG_NONE,
+        &checkboardDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(checkboardTex->UploadHeap.GetAddressOf())
+    ));
+    UpdateSubresources(m_CommandList.Get(),
+        checkboardTex->Resource.Get(), checkboardTex->UploadHeap.Get(),
+        0, 0, checkboardTex->SubResourceData.size(), checkboardTex->SubResourceData.data());
+    pBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
+        checkboardTex->Resource.Get(),
+        D3D12_RESOURCE_STATE_COPY_DEST,
+        D3D12_RESOURCE_STATE_COMMON
+    );
+    m_CommandList->ResourceBarrier(1, &pBarrier);
+    m_Textures[checkboardTex->Name] = std::move(checkboardTex);
 
-void MaterialApp::LoadDefaultWhiteTexture()
-{
+    std::unique_ptr<Texture> iceTex = std::make_unique<Texture>();
+    iceTex->Name = "iceTex";
+    iceTex->FileName = L"Textures/ice.dds";
+    iceTex->AlphaMode = DirectX::DDS_ALPHA_MODE_STRAIGHT;
+    iceTex->is_cube = false;
+    ThrowIfFailed(DirectX::LoadDDSTextureFromFile(
+        m_Device.Get(),
+        iceTex->FileName.c_str(),
+        iceTex->Resource.GetAddressOf(),
+        iceTex->Data,
+        iceTex->SubResourceData,
+        0, &iceTex->AlphaMode,
+        &iceTex->is_cube
+    ));
+    pBarrier = CD3DX12_RESOURCE_BARRIER::Transition(iceTex->Resource.Get(),
+        D3D12_RESOURCE_STATE_COMMON,
+        D3D12_RESOURCE_STATE_COPY_DEST);
+    m_CommandList->ResourceBarrier(1, &pBarrier);
+    CD3DX12_HEAP_PROPERTIES iceP(D3D12_HEAP_TYPE_UPLOAD);
+    UINT64 iceDescSize = GetRequiredIntermediateSize(iceTex->Resource.Get(),
+        0, iceTex->SubResourceData.size());
+    CD3DX12_RESOURCE_DESC iceDesc = CD3DX12_RESOURCE_DESC::Buffer(iceDescSize);
+    ThrowIfFailed(m_Device->CreateCommittedResource(
+        &iceP,
+        D3D12_HEAP_FLAG_NONE,
+        &iceDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(iceTex->UploadHeap.GetAddressOf())
+    ));
+    UpdateSubresources(m_CommandList.Get(),
+        iceTex->Resource.Get(), iceTex->UploadHeap.Get(),
+        0, 0, iceTex->SubResourceData.size(), iceTex->SubResourceData.data());
+    pBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
+        iceTex->Resource.Get(),
+        D3D12_RESOURCE_STATE_COPY_DEST,
+        D3D12_RESOURCE_STATE_COMMON
+    );
+    m_CommandList->ResourceBarrier(1, &pBarrier);
+    m_Textures[iceTex->Name] = std::move(iceTex);
+
     std::unique_ptr<Texture> defaultWhiteTex = std::make_unique<Texture>();
-    defaultWhiteTex->Name = "default";
+    defaultWhiteTex->Name = "defaultWhiteTex";
     defaultWhiteTex->FileName = L"";
     defaultWhiteTex->AlphaMode = DirectX::DDS_ALPHA_MODE_OPAQUE;
     defaultWhiteTex->is_cube = false;
 
-    const UINT width = 1;
-    const UINT height = 1;
+    UINT width = 1;
+    UINT height = 1;
     const DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    const UINT mipLevels = 1;
-
-    CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_DEFAULT);
-    CD3DX12_RESOURCE_DESC texDesc = CD3DX12_RESOURCE_DESC::Tex2D(
-        format,
-        width,
-        height,
-        1,
-        mipLevels,
-        1,
-        0,
-        D3D12_RESOURCE_FLAG_NONE);
-    ThrowIfFailed(m_Device->CreateCommittedResource(
-        &heapProps,
-        D3D12_HEAP_FLAG_NONE,
-        &texDesc,
-        D3D12_RESOURCE_STATE_COMMON,
-        nullptr,
-        IID_PPV_ARGS(defaultWhiteTex->Resource.GetAddressOf())));
-    
-    const UINT pixelSize = 4; //R8G8B8A8 4个字节
+    const UINT mipmapLevels = 1;
+    CD3DX12_HEAP_PROPERTIES whiteP(D3D12_HEAP_TYPE_DEFAULT);
+    CD3DX12_RESOURCE_DESC whiteDesc = CD3DX12_RESOURCE_DESC::Tex2D(format,
+        width, height, 1, mipmapLevels,
+        1, 0);
+    ThrowIfFailed(m_Device->CreateCommittedResource(&whiteP,
+        D3D12_HEAP_FLAG_NONE, &whiteDesc, D3D12_RESOURCE_STATE_COMMON,
+        nullptr, IID_PPV_ARGS(defaultWhiteTex->Resource.GetAddressOf())));
+    const UINT pixelSize = 4;
     const UINT rowPitch = width * pixelSize;
-    const UINT slicePitch = rowPitch * height;
-    defaultWhiteTex->Data = std::make_unique<uint8_t[]>(slicePitch); //数组的首地址
-    memset(defaultWhiteTex->Data.get(), 0xFF, slicePitch);//数组的首地址开始全部赋值为1
+    const UINT slicPitch = rowPitch * height;
+    defaultWhiteTex->Data = std::make_unique<uint8_t[]>(slicPitch);
+    memset(defaultWhiteTex->Data.get(), 0xFF, slicPitch);
     D3D12_SUBRESOURCE_DATA subResourceData{};
     subResourceData.pData = defaultWhiteTex->Data.get();
     subResourceData.RowPitch = rowPitch;
-    subResourceData.SlicePitch = slicePitch;
+    subResourceData.SlicePitch = slicPitch;
     defaultWhiteTex->SubResourceData.push_back(subResourceData);
 
-    CD3DX12_HEAP_PROPERTIES uploaderHeapProps(D3D12_HEAP_TYPE_UPLOAD);
-    UINT byteSize = GetRequiredIntermediateSize(defaultWhiteTex->Resource.Get(), 0, defaultWhiteTex->SubResourceData.size());
-
-    CD3DX12_RESOURCE_DESC uploadDesc = CD3DX12_RESOURCE_DESC::Buffer(byteSize);
-    m_Device->CreateCommittedResource(&uploaderHeapProps,
+    CD3DX12_HEAP_PROPERTIES defaultP = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+    UINT defaultSize = GetRequiredIntermediateSize(defaultWhiteTex->Resource.Get(),
+        0, defaultWhiteTex->SubResourceData.size());
+    CD3DX12_RESOURCE_DESC defaultDesc = CD3DX12_RESOURCE_DESC::Buffer(defaultSize);
+    ThrowIfFailed(m_Device->CreateCommittedResource(&defaultP,
         D3D12_HEAP_FLAG_NONE,
-        &uploadDesc,
+        &defaultDesc,
         D3D12_RESOURCE_STATE_GENERIC_READ,
         nullptr,
-        IID_PPV_ARGS(defaultWhiteTex->UploadHeap.GetAddressOf()));
-    CD3DX12_RESOURCE_BARRIER pBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
-        defaultWhiteTex->Resource.Get(),
-        D3D12_RESOURCE_STATE_COMMON,
-        D3D12_RESOURCE_STATE_COPY_DEST);
-    
+        IID_PPV_ARGS(defaultWhiteTex->UploadHeap.GetAddressOf())));
+    pBarrier = CD3DX12_RESOURCE_BARRIER::Transition(defaultWhiteTex->Resource.Get(),
+        D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
     m_CommandList->ResourceBarrier(1, &pBarrier);
-    UpdateSubresources(m_CommandList.Get(), defaultWhiteTex->Resource.Get(),
+    UpdateSubresources(m_CommandList.Get(),
+        defaultWhiteTex->Resource.Get(),
         defaultWhiteTex->UploadHeap.Get(),
-    0, 0,
-        defaultWhiteTex->SubResourceData.size(),
+        0, 0, defaultWhiteTex->SubResourceData.size(),
         defaultWhiteTex->SubResourceData.data());
-    pBarrier = CD3DX12_RESOURCE_BARRIER::Transition(defaultWhiteTex->Resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST,
-        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    pBarrier = CD3DX12_RESOURCE_BARRIER::Transition(defaultWhiteTex->Resource.Get(),
+        D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
     m_CommandList->ResourceBarrier(1, &pBarrier);
     m_Textures[defaultWhiteTex->Name] = std::move(defaultWhiteTex);
 }
 
-void MaterialApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems,
-    const std::vector<RenderItem*>& transparent)
+void MaterialApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems)
 {
     for (size_t i = 0; i < ritems.size(); i++)
     {
-        if (ritems[i]->Geo->Name == "box") //box的位置
-        {
-            cmdList->SetPipelineState(m_PSOs["alphaTest"].Get());
-        }
-        else
-        {
-            cmdList->SetPipelineState(m_PSOs["material"].Get());
-        }
         auto ri = ritems[i];
         D3D12_VERTEX_BUFFER_VIEW vertexBufferView = ri->Geo->VertexBufferView();
         D3D12_INDEX_BUFFER_VIEW indexBufferView = ri->Geo->IndexBufferView();
@@ -622,29 +754,6 @@ void MaterialApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std:
         cmdList->SetGraphicsRootConstantBufferView(1, objGPU);
         cmdList->SetGraphicsRootConstantBufferView(2, matGPU);
         cmdList->DrawIndexedInstanced(ri->IndexCount, 1, ri->StartIndexLocation, ri->BaseVertexLocation, 0);
-    }
-    for (int i = 0; i <transparent.size(); ++i)
-    {
-        auto ri = transparent[i];
-        cmdList->SetPipelineState(m_PSOs["transparent"].Get());
-        D3D12_VERTEX_BUFFER_VIEW vbv = ri->Geo->VertexBufferView();
-        D3D12_INDEX_BUFFER_VIEW ibv = ri->Geo->IndexBufferView();
-        cmdList->IASetVertexBuffers(0, 1, &vbv);
-        cmdList->IASetIndexBuffer(&ibv);
-        cmdList->IASetPrimitiveTopology(ri->PrimitiveType);
-
-        CD3DX12_GPU_DESCRIPTOR_HANDLE matHandle(m_SRVDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
-        matHandle.Offset(ri->mat->DiffuseSrvHeapIndex, m_CbvSrvUavDescriptorSize);
-        cmdList->SetGraphicsRootDescriptorTable(0, matHandle);
-        //const
-        ID3D12Resource* objR = (ID3D12Resource*)*m_CurrentFrameResource->ObjectCB.get();
-        ID3D12Resource* matR = (ID3D12Resource*)*m_CurrentFrameResource->MaterialCB.get();
-        D3D12_GPU_VIRTUAL_ADDRESS objGPU = objR->GetGPUVirtualAddress() + ri->ObjCBIndex * d3dUtil::CalcConstBufferByteSize(sizeof(ObjectConsts));
-        D3D12_GPU_VIRTUAL_ADDRESS matGPU = matR->GetGPUVirtualAddress() + ri->mat->MatCBIndex * d3dUtil::CalcConstBufferByteSize(sizeof(MaterialConstants));
-        cmdList->SetGraphicsRootConstantBufferView(1, objGPU);
-        cmdList->SetGraphicsRootConstantBufferView(2, matGPU);
-        cmdList->DrawIndexedInstanced(ri->IndexCount, 1, ri->StartIndexLocation, ri->BaseVertexLocation,
-            0);
     }
 }
 
@@ -669,12 +778,41 @@ void MaterialApp::CreatePSO()
     ComPtr<ID3D12PipelineState> pso;
     ThrowIfFailed(m_Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(pso.GetAddressOf())));
     m_PSOs["material"] = std::move(pso);
-    
-    psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
-    ComPtr<ID3D12PipelineState> alphaTestPSO;
-    ThrowIfFailed(m_Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(alphaTestPSO.GetAddressOf())));
-    m_PSOs["alphaTest"] = std::move(alphaTestPSO);
 
+    D3D12_DEPTH_STENCIL_DESC DepthStencilDesc{};
+    DepthStencilDesc.DepthEnable = true;
+    DepthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+    DepthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+    DepthStencilDesc.StencilEnable = true;
+    DepthStencilDesc.StencilReadMask = 0xff;
+    DepthStencilDesc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK; //0xff
+    DepthStencilDesc.FrontFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
+    DepthStencilDesc.FrontFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
+    DepthStencilDesc.FrontFace.StencilPassOp = D3D12_STENCIL_OP_REPLACE;
+    DepthStencilDesc.FrontFace.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+    //背面测试无所谓因为我们不渲染背面的三角形
+    DepthStencilDesc.BackFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
+    DepthStencilDesc.BackFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
+    DepthStencilDesc.BackFace.StencilPassOp = D3D12_STENCIL_OP_REPLACE;
+    DepthStencilDesc.BackFace.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+    psoDesc.DepthStencilState = DepthStencilDesc;
+    psoDesc.BlendState.RenderTarget[0].RenderTargetWriteMask = 0; //禁止颜色写入
+    ComPtr<ID3D12PipelineState> stencilRenderPso;
+    ThrowIfFailed(m_Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(stencilRenderPso.GetAddressOf())));
+    m_PSOs["stencilPass"] = std::move(stencilRenderPso);
+    
+    DepthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+    DepthStencilDesc.FrontFace.StencilPassOp = D3D12_STENCIL_OP_KEEP;
+    DepthStencilDesc.FrontFace.StencilFunc = D3D12_COMPARISON_FUNC_EQUAL;
+    DepthStencilDesc.BackFace.StencilPassOp = D3D12_STENCIL_OP_KEEP;
+    DepthStencilDesc.BackFace.StencilFunc = D3D12_COMPARISON_FUNC_EQUAL;
+    psoDesc.DepthStencilState = DepthStencilDesc;
+    psoDesc.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL; //开启颜色的写入
+    ComPtr<ID3D12PipelineState> ReflectPass;
+    ThrowIfFailed(m_Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(ReflectPass.GetAddressOf())));
+    m_PSOs["reflectionPass"] = std::move(ReflectPass);
+
+    psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
     D3D12_BLEND_DESC blendStateDesc{};
     blendStateDesc.AlphaToCoverageEnable = false;
     blendStateDesc.IndependentBlendEnable = false;
@@ -697,12 +835,28 @@ void MaterialApp::CreatePSO()
     ComPtr<ID3D12PipelineState> transparentPSO;
     ThrowIfFailed(m_Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(transparentPSO.GetAddressOf())));
     m_PSOs["transparent"] = std::move(transparentPSO);
+
+    DepthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+    DepthStencilDesc.FrontFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
+    DepthStencilDesc.FrontFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
+    DepthStencilDesc.FrontFace.StencilPassOp = D3D12_STENCIL_OP_INCR_SAT;
+    DepthStencilDesc.FrontFace.StencilFunc = D3D12_COMPARISON_FUNC_GREATER;
+    //背面测试无所谓因为我们不渲染背面的三角形
+    DepthStencilDesc.BackFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
+    DepthStencilDesc.BackFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
+    DepthStencilDesc.BackFace.StencilPassOp = D3D12_STENCIL_OP_INCR_SAT;
+    DepthStencilDesc.BackFace.StencilFunc = D3D12_COMPARISON_FUNC_GREATER;
+    psoDesc.DepthStencilState = DepthStencilDesc;
+    ComPtr<ID3D12PipelineState> shadowPso;
+    ThrowIfFailed(m_Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(shadowPso.GetAddressOf())));
+    m_PSOs["Shadow"] = std::move(shadowPso);
 }
 
 void MaterialApp::Update(const GameTimer& gt)
 {
     m_CurrentFrameIndex = (m_CurrentFrameIndex + 1) % gNumFrameResources;
     m_CurrentFrameResource = m_FrameResources[m_CurrentFrameIndex].get();
+    
     if (m_CurrentFrameResource->Fence != 0 && m_Fence->GetCompletedValue() < m_CurrentFrameResource->Fence)
     {
         HANDLE event = CreateEventEx(nullptr, nullptr, 0, EVENT_ALL_ACCESS);
@@ -720,13 +874,11 @@ void MaterialApp::Update(const GameTimer& gt)
     DirectX::XMMATRIX view = DirectX::XMMatrixLookAtLH(pos, target, up);
     DirectX::XMStoreFloat4x4(&m_View, view);
     DirectX::XMStoreFloat3(&m_Eyepos, pos);
-
-    AnimateMaterials(gt);
+    
     UpdateFramresouce(gt);
+    UpdateReflectFrameResources(gt);
     UpdateObj(gt);
     UpdateMaterial(gt);
-    UpdateSea(gt);
-
 }
 
 void MaterialApp::UpdateObj(const GameTimer& gt)
@@ -786,18 +938,34 @@ void MaterialApp::UpdateFramresouce(const GameTimer& gt)
     passCB.DeltaTime = gt.DeltaTime();
     DirectX::XMStoreFloat4(&passCB.gAmbientLight, DirectX::XMVectorSet(0.2f, 0.2f, 0.2f, 1.0f));
 
-    float sunX = 1.0f * sinf(m_SunPhi) * cosf(m_SunTheta);
-    float sunY = 1.0f * cosf(m_SunPhi);
-    float sunZ = 1.0f * sinf(m_SunTheta) * sinf(m_SunPhi);
-    DirectX::XMVECTOR lightDir = DirectX::XMVectorSet(-sunX, -sunY, -sunZ, 0.0f);
-    DirectX::XMStoreFloat3(&passCB.gLights[0].Direction, lightDir);
-    passCB.gLights[0].Strength = {1.0f, 1.0f, 0.9f};
+    passCB.Lights[0].Direction = { 0.57735f, -0.57735f, 0.57735f };
+    passCB.Lights[0].Strength = { 0.6f, 0.6f, 0.6f };
+    passCB.Lights[1].Direction = { -0.57735f, -0.57735f, 0.57735f };
+    passCB.Lights[1].Strength = { 0.3f, 0.3f, 0.3f };
+    passCB.Lights[2].Direction = { 0.0f, -0.707f, -0.707f };
+    passCB.Lights[2].Strength = { 0.15f, 0.15f, 0.15f };
     passCB.FogColor = DirectX::XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
     passCB.FogRange = 100.0f;
     passCB.FogStart = 40.0f;
     passCB.Padding = DirectX::XMFLOAT2(0.0f, 0.0f);
     m_CurrentFrameResource->PassCB->CopyData(0, passCB);
+    m_MainPassCB = passCB;
 }
+
+void MaterialApp::UpdateReflectFrameResources(const GameTimer& gt)
+{
+    m_ReflectedPassCB = m_MainPassCB;
+    DirectX::XMVECTOR ReflectFaceNormal = DirectX::XMVectorSet(0.0f, 0.0f, -1.0f, 0.0f);
+    DirectX::XMMATRIX ReflectionMatrix = DirectX::XMMatrixReflect(ReflectFaceNormal);
+    for (int i = 0; i < 3; ++i)
+    {
+        DirectX::XMVECTOR lightDir = DirectX::XMLoadFloat3(&m_MainPassCB.Lights[i].Direction);
+        lightDir = DirectX::XMVector3Transform(lightDir, ReflectionMatrix);
+        DirectX::XMStoreFloat3(&m_ReflectedPassCB.Lights[i].Direction, lightDir);
+    }
+    m_CurrentFrameResource->PassCB->CopyData(1, m_ReflectedPassCB);
+}
+
 
 void MaterialApp::UpdateMaterial(const GameTimer& gt)
 {
@@ -817,106 +985,6 @@ void MaterialApp::UpdateMaterial(const GameTimer& gt)
         }
     }
 }
-
-void MaterialApp::AnimateMaterials(const GameTimer& gt)
-{
-    auto waterMat = m_Materials["sea"].get();
-    float& tu = waterMat->MatTransform(3, 0);
-    float& tv = waterMat->MatTransform(3, 1);
-
-    tu += 0.1f * gt.DeltaTime();
-    tv += 0.02f * gt.DeltaTime();
-
-    if (tu >= 1.0f) tu -= 1.0f;
-    if (tv >= 1.0f) tv -= 1.0f;
-
-    waterMat->MatTransform(3, 0) = tu;
-    waterMat->MatTransform(3, 1) = tv;
-    waterMat->NumFrameDirty = gNumFrameResources;
-}
-
-
-DirectX::XMFLOAT3 MaterialApp::calculateNormal(float amplitude, float waveSpeed, float speed, float time, DirectX::XMFLOAT2 direction, DirectX::XMFLOAT2 pos_xy)
-{
-    DirectX::XMFLOAT3 normal = DirectX::XMFLOAT3(0.0f, 0.0f, 1.0f);
-    float w = 2.0f / waveSpeed;
-    float phi = speed * w;
-    float k = cosf((direction.x * pos_xy.x + direction.y * pos_xy.y) * w + time * phi);
-        
-    float x = -1.0f * amplitude * w * direction.x * k;
-    float z = -1.0f * amplitude * w * direction.y * k;
-    return {x, 1.0f, z};
-}
-
-float MaterialApp::CalculateWaveHeight(float amplitude, float waveSpeed, float speed, float time, DirectX::XMFLOAT2 direction, DirectX::XMFLOAT2 pos_xy)
-{
-    float w = 2.0f / waveSpeed;
-    float phi = speed * w;
-    float dDotPos = direction.x * pos_xy.x + direction.y * pos_xy.y;
-    float y = amplitude * sinf(w * dDotPos + time * phi);
-    return y;
-}
-
-
-
-void MaterialApp::UpdateSea(const GameTimer& gt)
-{
-    // 从原始网格数据获取顶点数量
-    GeometryGenerator geoGen;
-    GeometryGenerator::MeshData sea = geoGen.CreateGrid(160.0f, 160.0f, 50, 50);
-
-    WaveParams waveParams;
-
-    //然后根据数据去修改
-    float time = gt.TotalTime();
-    UINT vIdx = 0;
-    for (auto& vv : sea.Vertices)
-    {
-        Vertex v;
-        v.Pos = vv.Position;
-        v.Normal = vv.Normal;
-        DirectX::XMFLOAT2 seed;
-        seed.x = MathHelper::frac(v.Pos.x * 0.1234f + v.Pos.z * 0.5678f);
-        seed.y = MathHelper::frac(v.Pos.x * 0.8765f - v.Pos.z * 0.4321f);
-        for (UINT i = 0; i <3; i++)
-        {
-            float seedOffset = static_cast<float>(i) * 0.333f;
-            DirectX::XMFLOAT2 waveSeed;
-            waveSeed.x = MathHelper::frac(seed.x + seedOffset);
-            waveSeed.y = MathHelper::frac(seed.y + seedOffset * 1.7f);
-            
-            float amplitude = waveParams.A_min + 
-                (waveParams.A_max - waveParams.A_min) * waveSeed.x;
-            float waveLength = waveParams.WaveLength_min + 
-                (waveParams.WaveLength_max - waveParams.WaveLength_min) * waveSeed.y;
-            float speed = waveParams.Speed_min + 
-                (waveParams.Speed_max - waveParams.Speed_min) * 
-                MathHelper::frac(waveSeed.x + waveSeed.y);
-            
-            // 生成波浪方向
-            float angle = waveSeed.x * DirectX::XM_2PI;
-            DirectX::XMFLOAT2 direction(cosf(angle), sinf(angle));
-            DirectX::XMFLOAT2 pos_xy = {v.Pos.x, v.Pos.z};
-            
-            // 累加波浪高度
-            v.Pos.y += CalculateWaveHeight(amplitude, waveLength, speed, 
-                                          time, direction, pos_xy);
-            
-            // 累加法线偏移
-            DirectX::XMFLOAT3 deltaNormal = calculateNormal(amplitude, waveLength, 
-                                                           speed, time, direction, pos_xy);
-            v.Normal.x += deltaNormal.x;
-            v.Normal.z += deltaNormal.z;
-            v.Normal.y = 1.0f;
-        }
-        DirectX::XMVECTOR n = DirectX::XMLoadFloat3(&v.Normal);
-        n = DirectX::XMVector3Normalize(n);
-        DirectX::XMStoreFloat3(&v.Normal, n);
-        m_SeaUploaderBuffer->CopyData(vIdx, v);
-        ++vIdx;
-    }
-}
-
 
 void MaterialApp::OnMouseDown(WPARAM btnState, int x, int y)
 {
@@ -948,8 +1016,6 @@ void MaterialApp::OnMouseUp(WPARAM btnState, int x, int y)
     ReleaseCapture();
 }
 
- 
-
 
 void MaterialApp::Draw(const GameTimer& gt)
 {
@@ -975,19 +1041,31 @@ void MaterialApp::Draw(const GameTimer& gt)
     ID3D12Resource* FrameConstResource = (ID3D12Resource*)*m_CurrentFrameResource->PassCB.get();
     D3D12_GPU_VIRTUAL_ADDRESS pFrameResource = FrameConstResource->GetGPUVirtualAddress();
     m_CommandList->SetGraphicsRootConstantBufferView(3, pFrameResource);
-    m_Opaques.clear();
-    m_Transparent.clear();
-    for (int i = 0; i < m_RenderItems.size(); ++i)
-    {
-        if (m_RenderItems[i]->Geo->Name == "sea")
-        {
-            m_Transparent.push_back(m_RenderItems[i].get());
-            continue;
-        }
-        m_Opaques.push_back(m_RenderItems[i].get());
-    }
-    DrawRenderItems(m_CommandList.Get(), m_Opaques, m_Transparent);
+    m_CommandList->SetPipelineState(m_PSOs["material"].Get());
+    DrawRenderItems(m_CommandList.Get(), m_PassRenderItems[(int)RenderLayer::Opaque]);
 
+    //stencilPass
+    m_CommandList->OMSetStencilRef(1);
+    m_CommandList->SetPipelineState(m_PSOs["stencilPass"].Get());
+    DrawRenderItems(m_CommandList.Get(), m_PassRenderItems[(int)RenderLayer::Mirrors]);
+    
+    // ReflectionPass
+    m_CommandList->SetPipelineState(m_PSOs["reflectionPass"].Get());
+    pFrameResource = FrameConstResource->GetGPUVirtualAddress() + d3dUtil::CalcConstBufferByteSize(sizeof(PassConstant));
+    m_CommandList->SetGraphicsRootConstantBufferView(3, pFrameResource);
+    DrawRenderItems(m_CommandList.Get(), m_PassRenderItems[(int)RenderLayer::Reflected]);
+
+    //finalpass
+    m_CommandList->SetPipelineState(m_PSOs["transparent"].Get());
+    pFrameResource = FrameConstResource->GetGPUVirtualAddress();
+    m_CommandList->SetGraphicsRootConstantBufferView(3, pFrameResource);
+    DrawRenderItems(m_CommandList.Get(), m_PassRenderItems[(int)RenderLayer::Transparent]);
+
+    //shadow
+    m_CommandList->ClearDepthStencilView(DepthHandle, D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
+    m_CommandList->SetPipelineState(m_PSOs["Shadow"].Get());
+    DrawRenderItems(m_CommandList.Get(), m_PassRenderItems[(int)RenderLayer::Shadow]);
+    
     pBarrier = CD3DX12_RESOURCE_BARRIER::Transition(CurrentFrame, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
     m_CommandList->ResourceBarrier(1, &pBarrier);
     ThrowIfFailed(m_CommandList->Close());
